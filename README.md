@@ -23,3 +23,18 @@ a doable text editor.
 
 
 ->Sepparated the "Compile" and "Run" Buttons
+
+
+## ADDITIONAL INFO:
+
+
+-> This was built on top of the existing codename TEDitor architecture, so parts of the code found in the pre alpha code are still found in the new code
+
+
+-> The program, although still being in the "alpha" stage is far from release, so don't expect one anytime soon
+
+
+-> To run this, open the project in an ide of your choice, build it and then run it
+
+
+-> If you want to actually contribute to the project, just leave a suggestion somewhere in here idk

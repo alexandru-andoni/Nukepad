@@ -4,9 +4,6 @@
 a doable text editor.
 
 
-![alt text](https://github.com/alexandru-andoni/Nukepad/blob/master/nukepadlogo.png
-
-
 ## UPDATE LOGS:
 
 

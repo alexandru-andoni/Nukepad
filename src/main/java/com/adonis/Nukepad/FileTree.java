@@ -62,6 +62,8 @@ public class FileTree extends JTree {
                        case"c":
                            Nukepad.getInstance().text.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_C);
                            break;
+                       case"tsx":
+                           Nukepad.getInstance().text.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_TYPESCRIPT);
                       
                        default:
                            Nukepad.getInstance().text.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_NONE);

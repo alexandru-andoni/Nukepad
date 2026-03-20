@@ -5,9 +5,19 @@
 package com.adonis.Nukepad;
 
 import java.awt.BorderLayout;
+import java.awt.CardLayout;
+import java.awt.Color;
 import java.awt.Component;
+import java.awt.Dimension;
+import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.GridBagConstraints;
+import java.awt.GridBagLayout;
+import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
+import java.awt.event.MouseAdapter;
+import java.awt.event.MouseEvent;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
@@ -16,26 +26,40 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.Paths;
+import java.util.LinkedHashMap;
+import java.util.Map;
+import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import javax.swing.BorderFactory;
+import javax.swing.BoxLayout;
+import javax.swing.DefaultListModel;
 import javax.swing.ImageIcon;
 import javax.swing.JButton;
 import javax.swing.JFileChooser;
 import javax.swing.JFrame;
 import javax.swing.JLabel;
+import javax.swing.JList;
 import javax.swing.JMenu;
 import javax.swing.JMenuBar;
 import javax.swing.JMenuItem;
 import javax.swing.JOptionPane;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JSplitPane;
 import javax.swing.JTabbedPane;
 import javax.swing.JTextArea;
 import javax.swing.JTree;
+import javax.swing.ListSelectionModel;
+import javax.swing.SwingConstants;
 import javax.swing.UIManager;
 import javax.swing.plaf.metal.MetalLookAndFeel;
 import javax.swing.plaf.metal.OceanTheme;
+import javax.swing.tree.DefaultMutableTreeNode;
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
 import org.fife.ui.autocomplete.AutoCompletion;
@@ -145,16 +169,25 @@ class Nukepad extends JFrame implements ActionListener{
         JTree tree = new FileTree(rootDir);
         tree.setCellRenderer(new FileTreeCellRenderer());
         JScrollPane treeScroll = new JScrollPane(tree);
+        JPanel categoriesPanel = buildCategoriesPanel();
+        JScrollPane categoriesScroll = new JScrollPane(categoriesPanel);
         
         
-        JSplitPane splitPane = new JSplitPane (
+        JSplitPane leftSplit = new JSplitPane (
+            JSplitPane.VERTICAL_SPLIT,
+            treeScroll,
+                categoriesScroll
+        );
+        leftSplit.setDividerLocation(300);
+        leftSplit.setResizeWeight(0.5);
+        
+        JSplitPane mainSplit = new JSplitPane (
         JSplitPane.HORIZONTAL_SPLIT,
-        treeScroll,
+        leftSplit,
         tabs
         );
-        splitPane.setDividerLocation(250);
         
-        frame.add(splitPane, BorderLayout.CENTER);
+        frame.add(mainSplit, BorderLayout.CENTER);
         instance = this;
         
         frame.setSize(1280, 720);
@@ -363,7 +396,7 @@ class Nukepad extends JFrame implements ActionListener{
     panel.setOpaque(false);
 
     JLabel label = new JLabel(title);
-    JButton close = new JButton("x");
+    JButton close = new JButton("✕");
     close.setBorder(null);
     close.setFocusable(false);
     close.setContentAreaFilled(false);
@@ -380,6 +413,121 @@ class Nukepad extends JFrame implements ActionListener{
 
     tabs.setTabComponentAt(tabs.indexOfComponent(tab), panel);
     }
-   
 
+    private JPanel buildCategoriesPanel() {
+        JPanel panel = new JPanel();
+        panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
+        
+        Map<String, DefaultListModel<String>> categories = new LinkedHashMap<>();
+        
+        JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 4));
+        JButton addCat = new JButton("Add Category (+)");
+        JButton removeCat = new JButton("Remove Category (-)");
+        toolbar.add(addCat);
+        toolbar.add(removeCat);
+        panel.add(toolbar);
+        JLabel[] selected = {null};
+        
+        addCat.addActionListener(e -> {
+            String name = JOptionPane.showInputDialog(panel, "Category Name:");
+            if (name == null || name.isBlank()) return;
+            
+            DefaultListModel<String> model = new DefaultListModel<>();
+            categories.put(name, model);
+            
+            JPanel section = buildCategorySection(name, model, categories, panel);
+            panel.add(section);
+            panel.revalidate();
+        });
+        removeCat.addActionListener(new ActionListener() {
+            @Override
+            public void actionPerformed(ActionEvent e) {
+                String[] names = categories.keySet().toArray(new String[0]);
+                String choice = (String) JOptionPane.showInputDialog(
+                        panel, "Which category to remove?", "Remove",
+                        JOptionPane.PLAIN_MESSAGE, null, names,
+                        names.length >0?names[0] : null);
+                if(choice == null) return;
+                categories.remove(choice);
+                panel.removeAll();
+                panel.add(toolbar);
+                categories.forEach((n, m) ->
+                        panel.add(buildCategorySection(n, m, categories, panel)));
+                panel.revalidate();
+                panel.repaint();
+            }
+        });
+        return panel;
+    }
+
+    private JPanel buildCategorySection(
+            String name,
+            DefaultListModel<String> model, 
+            Map<String, DefaultListModel<String>> allCategories, 
+            JPanel parent) {
+        JPanel section = new JPanel(new BorderLayout());
+        section.setBorder(BorderFactory.createTitledBorder(name));
+        JList<String> list = new JList<>(model);
+        list.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
+        section.add(new JScrollPane(list), BorderLayout.CENTER);
+        
+        JPopupMenu popup = new JPopupMenu();
+        JMenuItem addFile = new JMenuItem("Add file...");
+        JMenuItem addFolder = new JMenuItem("Add folder...");
+        JMenuItem removeItem = new JMenuItem("Remove selected");
+        
+        addFile.addActionListener( e -> {
+            JFileChooser fc = new JFileChooser();
+            fc.setFileSelectionMode(JFileChooser.FILES_ONLY);
+            fc.setMultiSelectionEnabled(true);
+            if (fc.showOpenDialog(parent) == JFileChooser.APPROVE_OPTION)
+                for(File f : fc.getSelectedFiles())
+                    model.addElement(f.getAbsolutePath());
+            
+        });
+        popup.add(addFile);
+        popup.add(addFolder);
+        popup.addSeparator();
+        popup.add(removeItem);
+        
+        list.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mousePressed(MouseEvent e) {
+                maybeShow(e);
+            }
+            @Override
+            public void mouseReleased(MouseEvent e) {
+                maybeShow(e);
+            }
+            private void maybeShow(MouseEvent e){
+                if(e.isPopupTrigger())
+                    popup.show(list, e.getX(), e.getY());
+            }
+        });
+        list.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if(e.getClickCount() == 2) {
+                    String path = list.getSelectedValue();
+                    if(path == null) return;
+                    String content;
+                    try {
+                        content = new String(Files.readAllBytes(Paths.get(path)));
+                        JTextArea textArea = new JTextArea(content);
+                    JScrollPane scroll = new JScrollPane(textArea);
+                    tabs.addTab(new File(path).getName(), scroll);
+                    tabs.setSelectedIndex(tabs.getTabCount() - 1);
+                    } catch (IOException ex) {
+                        System.getLogger(Nukepad.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
+                    }
+                    
+                    }
+                        
+                }
+            });
+        
+     return section;  
+    }
+   
+    
 }

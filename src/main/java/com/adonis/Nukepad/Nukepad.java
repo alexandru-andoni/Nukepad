@@ -172,24 +172,24 @@ class Nukepad extends JFrame implements ActionListener{
         JPanel categoriesPanel = buildCategoriesPanel();
         JScrollPane categoriesScroll = new JScrollPane(categoriesPanel);
         
-        
-        JSplitPane leftSplit = new JSplitPane (
-            JSplitPane.VERTICAL_SPLIT,
-            treeScroll,
-                categoriesScroll
-        );
-        leftSplit.setDividerLocation(300);
-        leftSplit.setResizeWeight(0.5);
+        SearchPanel searchPanel = new SearchPanel(new File("C:\\Users"));
+        searchPanel.setPreferredSize(new Dimension(280, 0));
+        searchPanel.setMinimumSize(new Dimension(100, 100));
+        JTabbedPane leftTabs = new JTabbedPane();
+        leftTabs.addTab("Files", treeScroll);
+        leftTabs.addTab("Search", searchPanel);
+        leftTabs.addTab("Categories", categoriesScroll);
+        leftTabs.setPreferredSize(new Dimension(280, 0));
         
         JSplitPane mainSplit = new JSplitPane (
-        JSplitPane.HORIZONTAL_SPLIT,
-        leftSplit,
-        tabs
+            JSplitPane.HORIZONTAL_SPLIT,
+                leftTabs,
+                tabs
         );
+        mainSplit.setDividerLocation(280);
         
         frame.add(mainSplit, BorderLayout.CENTER);
         instance = this;
-        
         frame.setSize(1280, 720);
         frame.setVisible(true);
         

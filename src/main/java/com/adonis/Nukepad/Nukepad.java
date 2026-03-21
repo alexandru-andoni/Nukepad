@@ -84,7 +84,7 @@ class Nukepad extends JFrame implements ActionListener{
     JFrame frame;
     private File currentFile;
     
-    Nukepad() {
+    Nukepad(File projectRoot) {
         frame = new JFrame("Editor");
         ImageIcon icon = new ImageIcon(getClass().getResource("/icons/nukepadlogo.png"));
         frame.setIconImage(icon.getImage());
@@ -310,7 +310,7 @@ class Nukepad extends JFrame implements ActionListener{
         }
     }
     public static void main(String[] args) {
-        Nukepad n = new Nukepad();
+        new IntroScreen();
     }
     public void openWebPage(String url) {
         try {

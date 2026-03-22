@@ -36,7 +36,7 @@ It's not trying to replace your IDE (and it won't, really). It's a passion (vibe
 ### v0.1.3
 
 - Fixed intro screen delay — chime sound now loads on a background thread instead of blocking the UI
-- Fixed editor startup delay — FileTree, SearchPanel and buildCategoriesPane` now load asynchronously via SwingWorker, showing the editor instantly
+- Fixed editor startup delay — FileTree, SearchPanel and buildCategoriesPane now load asynchronously via SwingWorker, showing the editor instantly
 - Fixed hardcoded C:\Users path in SearchPanel, now uses the system home directory (cross-platform fix)
 - Migrated to FlatLaf (FlatDarcula / FlatIntelliJ) for a modern look and feel
 - Added dark/light theme switcher to the editor View menu

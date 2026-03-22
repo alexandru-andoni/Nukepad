@@ -53,6 +53,7 @@ It's not trying to replace your IDE (and it won't, really). It's a passion (vibe
 
 - Fixed loading issues by transforming part of the loading processes into lazy loading
 - Fixed the compiler producing garbage and the run button not executing properly
+- Added drag-n-drop and fixed some more bugs
 
 
 ### v0.1.3 - alpha Patch $01

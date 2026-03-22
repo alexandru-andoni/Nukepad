@@ -63,7 +63,27 @@ public class FileTree extends JTree {
                            Nukepad.getInstance().text.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_C);
                            break;
                        case"tsx":
+                       case"ts":
+                       case"jsx":
                            Nukepad.getInstance().text.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_TYPESCRIPT);
+                           break;
+                       case"json":
+                           Nukepad.getInstance().text.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JSON);
+                           break;
+                       case"f":
+                       case"f90":
+                       case"for":
+                           Nukepad.getInstance().text.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_FORTRAN);
+                           break;
+                       case"sql":
+                           Nukepad.getInstance().text.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_SQL);
+                           break;
+                       case"go":
+                           Nukepad.getInstance().text.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_GO);
+                           break;
+                       case"php":
+                           Nukepad.getInstance().text.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_PHP);
+                           break;
                       
                        default:
                            Nukepad.getInstance().text.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_NONE);

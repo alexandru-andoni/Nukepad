@@ -100,6 +100,8 @@ class Nukepad extends JFrame implements ActionListener{
         tabs = new JTabbedPane();
         tabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
         
+        
+        
         text = new RSyntaxTextArea();
         text.setCodeFoldingEnabled(true);
         text.setAntiAliasingEnabled(true);
@@ -111,6 +113,7 @@ class Nukepad extends JFrame implements ActionListener{
         RTextScrollPane scroll = new RTextScrollPane(text);
         scroll.setRowHeaderView(new LineNumberPanel(text));
         tabs.addTab("Untitled", scroll);
+        
         
         JMenuBar menb = new JMenuBar();
         JMenu men1 = new JMenu("File");
@@ -211,6 +214,10 @@ class Nukepad extends JFrame implements ActionListener{
         tabs = new JTabbedPane();
         tabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
         tabs.addTab("Untitled", scroll2);
+        
+        setupDragAndDrop(tabs);
+        setupDragAndDrop(scroll2);
+        setupDragAndDrop(text);
         
         JLabel loadingLabel = new JLabel("Loading...", SwingConstants.CENTER);
         JSplitPane mainSplit = new JSplitPane (
@@ -363,20 +370,22 @@ class Nukepad extends JFrame implements ActionListener{
                }
                break;
            case "Open":
-               JFileChooser jOpen = new JFileChooser("f:");
+               JFileChooser jOpen = new JFileChooser(System.getProperty("user.home"));
+               jOpen.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
                int rOpen = jOpen.showOpenDialog(null);
                if (rOpen == JFileChooser.APPROVE_OPTION) {
-                   File file = new File(jOpen.getSelectedFile().getAbsolutePath());
-                   try(BufferedReader reader = new BufferedReader(new FileReader(file))) {
-                       StringBuilder string = new StringBuilder();
-                       String line;
-                       while((line = reader.readLine()) != null){
-                           string.append(line).append("\n");
+                   File file = jOpen.getSelectedFile();
+                   if(file.isDirectory()) {
+                       addToOpenedProjects(file.getAbsolutePath());
+                   } else {
+                       try {
+                           String content = new String(Files.readAllBytes(file.toPath()));
+                           openFileInNewTab(file, content);
+                       } catch (Exception evt) {
+                           JOptionPane.showMessageDialog(frame,evt.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
                        }
-                       text.setText(string.toString());
-                   } catch (Exception evt) {
-                       JOptionPane.showMessageDialog(frame, evt.getMessage());
                    }
+                   
                } else {
                    JOptionPane.showMessageDialog(frame, "The user has cancelled the operation!");
                }
@@ -503,6 +512,27 @@ class Nukepad extends JFrame implements ActionListener{
             case"c":
                 editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_C);
                 break;
+            case"tsx":
+            case"ts":
+            case "jsx":
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_TYPESCRIPT);
+                break;
+            case"json":
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JSON);
+                break;
+            case"sql":
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_SQL);
+                break;
+            case"go":
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_GO);
+                break;
+            case"f90":
+            case"f":
+            case"for":
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_FORTRAN);
+                break;
+            case"php":
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_PHP);
             default:
                 editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_NONE);
                 break;
@@ -521,6 +551,9 @@ class Nukepad extends JFrame implements ActionListener{
         makeTabClosable(tabs, scroll, file.getName(), file.getAbsolutePath());
         
        addToOpenedProjects(file.getParentFile().getAbsolutePath());
+       
+       setupDragAndDrop(scroll);
+       setupDragAndDrop(editor);
     }
 
    private void makeTabClosable(JTabbedPane tabs, Component tab, String title, String fullPath) {
@@ -736,6 +769,33 @@ class Nukepad extends JFrame implements ActionListener{
         folderNode.add(new DefaultMutableTreeNode("Loading..."));
         root.add(folderNode);
         openedProjectsTreeModel.reload(root);
+    }
+    
+    public void setupDragAndDrop(Component target) {
+        new java.awt.dnd.DropTarget(target, new java.awt.dnd.DropTargetAdapter() {
+            @Override
+            public void drop(java.awt.dnd.DropTargetDropEvent evt) {
+                try {
+                    evt.acceptDrop(java.awt.dnd.DnDConstants.ACTION_COPY);
+                    java.awt.datatransfer.Transferable transferable = evt.getTransferable();
+                    java.util.List<File> files = (java.util.List<File>)
+                            transferable.getTransferData(java.awt.datatransfer.DataFlavor.javaFileListFlavor);
+                    
+                    for (File file : files) {
+                        if(file.isDirectory()) {
+                            addToOpenedProjects(file.getAbsolutePath());
+                        } else {
+                            String content = new String(Files.readAllBytes(file.toPath()));
+                            openFileInNewTab(file, content);
+                        }
+                    }
+                    evt.dropComplete(true);
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                    evt.dropComplete(false);
+                }
+            }
+        });
     }
 
  

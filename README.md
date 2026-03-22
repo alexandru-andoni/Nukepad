@@ -34,14 +34,12 @@ It's not trying to replace your IDE(and it won't, really). It's a passion (vibec
 ## Updates
 
 ### v0.1.3
-- Reorganized the three sidebar categories into irremovable tabs on the left
-- Added an intro screen with chimes and functions to open files and projects
-- Added search function
-- Added opening projects
-- Buttons now look more glassy
+**Performance fixes:**
 - Fixed intro screen delay — chime sound now loads on a background thread instead of blocking the UI
-- Fixed editor startup delay — FileTree, SearchPanel and buildCategoriesPanel now load asynchronously via SwingWorker, showing the editor instantly
-- Fixed hardcoded C:\Users path in SearchPanel, now uses the system home directory 
+- Fixed editor startup delay — FileTree, SearchPanel and buildCategoriesPane` now load asynchronously via SwingWorker, showing the editor instantly
+- Fixed hardcoded C:\Users path in SearchPanel, now uses the system home directory (cross-platform fix)
+
+**Theming:**
 - Migrated to FlatLaf (FlatDarcula / FlatIntelliJ) for a modern look and feel
 - Added dark/light theme switcher to the editor View menu
 - Added Monokai syntax theme for dark mode and IntelliJ syntax theme for light mode via RSyntaxTextArea's built-in theme system

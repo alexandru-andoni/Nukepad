@@ -5,6 +5,7 @@
 package com.adonis.Nukepad;
 
 import java.awt.Dimension;
+import java.awt.Font;
 import java.awt.FontMetrics;
 import java.awt.Graphics;
 import javax.swing.JPanel;
@@ -24,6 +25,7 @@ class LineNumberPanel extends JPanel implements CaretListener, DocumentListener 
     
     public LineNumberPanel(JTextArea textArea) {
         this.textArea = textArea;
+        setFont(new Font(Font.SANS_SERIF, Font.PLAIN, 12));
         textArea.getDocument().addDocumentListener(this);
         textArea.addCaretListener(this);
         setPreferredWidth();
@@ -43,6 +45,7 @@ class LineNumberPanel extends JPanel implements CaretListener, DocumentListener 
     @Override
     protected void paintComponent(Graphics g) {
         super.paintComponent(g);
+        g.setFont(getFont());
         FontMetrics fontm = textArea.getFontMetrics(textArea.getFont());
         int lineheight = fontm.getHeight();
         int start = textArea.getVisibleRect().y / lineheight + 1;

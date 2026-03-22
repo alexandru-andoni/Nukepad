@@ -56,8 +56,11 @@ import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.UnsupportedLookAndFeelException;
+import javax.swing.event.TreeExpansionEvent;
 import javax.swing.plaf.metal.MetalLookAndFeel;
 import javax.swing.plaf.metal.OceanTheme;
+import javax.swing.tree.DefaultMutableTreeNode;
+import javax.swing.tree.DefaultTreeModel;
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
 import org.fife.ui.autocomplete.AutoCompletion;
@@ -74,6 +77,7 @@ import org.fife.ui.rtextarea.RTextScrollPane;
  */
 class Nukepad extends JFrame implements ActionListener{
 
+    private DefaultTreeModel openedProjectsTreeModel = new DefaultTreeModel(new DefaultMutableTreeNode("Projects"));
     public static Nukepad getInstance() {
         return instance;
     }
@@ -234,12 +238,74 @@ class Nukepad extends JFrame implements ActionListener{
                 searchPanel.setPreferredSize(new Dimension(280, 0));
                 searchPanel.setMinimumSize(new Dimension(100, 100));
                 
+                JTree openedTree = new JTree(openedProjectsTreeModel);
+                openedTree.setCellRenderer(new FileTreeCellRenderer());
+                openedTree.setRootVisible(false);
+                openedTree.addMouseListener(new MouseAdapter() {
+                    @Override
+                    public void mouseClicked(MouseEvent e) {
+                      if(e.getClickCount() == 2) {
+                          int row = openedTree.getRowForLocation(e.getX(), e.getY());
+                          if(row < 0) return;
+                          javax.swing.tree.TreePath treePath = openedTree.getPathForRow(row);
+                          if (treePath == null) return;
+                          DefaultMutableTreeNode node = (DefaultMutableTreeNode) treePath.getLastPathComponent();
+                          Object userObj = node.getUserObject();
+                          if (!(userObj instanceof File)) return;
+                          File clicked = (File) userObj;
+                          if(clicked.isDirectory()) return;
+                          try {
+                              String content = new String(Files.readAllBytes(clicked.toPath()));
+                              openFileInNewTab(clicked, content);
+                          } catch (IOException ex) {
+                              ex.printStackTrace();
+                          }
+                      }  
+                    }
+                });
+               JScrollPane openedScroll = new JScrollPane(openedTree);
+               openedTree.setRootVisible(false);
+                openedTree.addTreeExpansionListener(new javax.swing.event.TreeExpansionListener() {
+                    @Override
+                    public void treeExpanded(javax.swing.event.TreeExpansionEvent event) {
+                        DefaultMutableTreeNode node = (DefaultMutableTreeNode)
+                                event.getPath().getLastPathComponent();
+                        
+                        if(node.getChildCount() == 1 && node.getFirstChild().toString().equals("Loading...")) {
+                            node.removeAllChildren();
+                            File folder = (File) node.getUserObject();
+                            File[] children = folder.listFiles();
+                            if(children != null) {
+                                java.util.Arrays.sort(children, (a,b) -> {
+                                    if(a.isDirectory() && !b.isDirectory()) return -1;
+                                    if(!a.isDirectory() && b.isDirectory()) return 1;
+                                    return a.getName().compareToIgnoreCase(b.getName());
+                                });
+                                for (File child : children) {
+                                    DefaultMutableTreeNode childNode = new DefaultMutableTreeNode(child);
+                                    if(child.isDirectory()) {
+                                        childNode.add(new DefaultMutableTreeNode("Loading..."));
+                                    }
+                                    node.add(childNode);
+                                }
+                            }
+                            openedProjectsTreeModel.reload(node);
+                        }
+                    }
+
+                    @Override
+                    public void treeCollapsed(TreeExpansionEvent event) {
+                    }
+                });
+                
                 JTabbedPane leftTabs = new JTabbedPane();
                 leftTabs.addTab("Files", treeScroll);
                 leftTabs.addTab("Search", searchPanel);
                 leftTabs.addTab("Categories", categoriesScroll);
+                leftTabs.addTab("Opened Projects", openedScroll);
                 leftTabs.setPreferredSize(new Dimension(280, 0));
                 return leftTabs;
+               
             }
             @Override
             protected void done() {
@@ -452,10 +518,12 @@ class Nukepad extends JFrame implements ActionListener{
         this.text = editor;
         this.currentFile = file;
         
-        makeTabClosable(tabs, scroll, file.getName());
+        makeTabClosable(tabs, scroll, file.getName(), file.getAbsolutePath());
+        
+       addToOpenedProjects(file.getParentFile().getAbsolutePath());
     }
 
-   private void makeTabClosable(JTabbedPane tabs, Component tab, String title) {
+   private void makeTabClosable(JTabbedPane tabs, Component tab, String title, String fullPath) {
     JPanel panel = new JPanel(new BorderLayout());
     panel.setOpaque(false);
 
@@ -521,6 +589,7 @@ class Nukepad extends JFrame implements ActionListener{
                 panel.repaint();
             }
         });
+       
         return panel;
     }
     private void applyThemeToAllTabs() {
@@ -584,6 +653,14 @@ class Nukepad extends JFrame implements ActionListener{
                     model.addElement(f.getAbsolutePath());
             
         });
+        addFolder.addActionListener(e -> {
+            JFileChooser fc2 = new JFileChooser();
+            fc2.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
+            if (fc2.showOpenDialog(parent) == JFileChooser.APPROVE_OPTION) {
+                File folder = fc2.getSelectedFile();
+                addFilesFromFolder(folder, model);
+            }
+        });
         popup.add(addFile);
         popup.add(addFolder);
         popup.addSeparator();
@@ -609,25 +686,58 @@ class Nukepad extends JFrame implements ActionListener{
                 if(e.getClickCount() == 2) {
                     String path = list.getSelectedValue();
                     if(path == null) return;
-                    String content;
+                    File f = new File(path);
+                    if(!f.exists() || f.isDirectory()) return;
                     try {
-                        content = new String(Files.readAllBytes(Paths.get(path)));
-                        JTextArea textArea = new JTextArea(content);
-                    JScrollPane scroll = new JScrollPane(textArea);
-                    tabs.addTab(new File(path).getName(), scroll);
-                    tabs.setSelectedIndex(tabs.getTabCount() - 1);
+                        String content = new String(Files.readAllBytes(Paths.get(path)));
+                        openFileInNewTab(f, content);
                     } catch (IOException ex) {
-                        System.getLogger(Nukepad.class.getName()).log(System.Logger.Level.ERROR, (String) null, ex);
-                    }
-                    
+                        ex.printStackTrace();
                     }
                         
                 }
-            });
+            }
+        });
         
      return section;  
     }
-    
+
+    private void addFilesFromFolder(File folder, DefaultListModel<String> model) {
+        addFilesFromFolderRecursive(folder, model, 0);
+    }
+
+    private void addFilesFromFolderRecursive(File folder, DefaultListModel<String> model, int depth) {
+        String indent = " ".repeat(depth);
+        model.addElement(indent + "[" + folder.getName() + "]");
+        File[] children = folder.listFiles();
+        if(children == null) return;
+        java.util.Arrays.sort(children, (a,b) -> {
+            if (a.isDirectory() && !b.isDirectory()) return -1;
+            if(!a.isDirectory() && b.isDirectory()) return 1;
+            return a.getName().compareToIgnoreCase(b.getName());
+        });
+        for (File child : children) {
+            if (child.isDirectory()) {
+                addFilesFromFolderRecursive(child, model, depth + 1);
+            } else {
+                model.addElement(child.getAbsolutePath());
+            }
+        }
+    }
+
+    public void addToOpenedProjects(String path) {
+        File folder = new File(path);
+        DefaultMutableTreeNode root = (DefaultMutableTreeNode) openedProjectsTreeModel.getRoot();
+        for (int i = 0; i < root.getChildCount(); i++) {
+            DefaultMutableTreeNode child = (DefaultMutableTreeNode) root.getChildAt(i);
+            if (child.getUserObject().equals(folder)) return;
+        }
+        DefaultMutableTreeNode folderNode = new DefaultMutableTreeNode(folder);
+        folderNode.add(new DefaultMutableTreeNode("Loading..."));
+        root.add(folderNode);
+        openedProjectsTreeModel.reload(root);
+    }
+
  
     
 }

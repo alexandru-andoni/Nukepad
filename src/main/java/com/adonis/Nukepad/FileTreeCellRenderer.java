@@ -29,11 +29,16 @@ public class FileTreeCellRenderer extends DefaultTreeCellRenderer {
         super.getTreeCellRendererComponent(tree, value, sel, expanded, leaf, row, hasFocus);
 
         DefaultMutableTreeNode node = (DefaultMutableTreeNode) value;
-        File file = (File) node.getUserObject();
+        Object userObj = node.getUserObject();
 
+        if (!(userObj instanceof File)) {
+            setText(userObj.toString());
+            setIcon(null);
+            return this;
+        }
+        File file = (File) userObj;
         setText(file.getName());
         setIcon(file.isDirectory() ? folderIcon : fileIcon);
-
         return this;
     }
 }

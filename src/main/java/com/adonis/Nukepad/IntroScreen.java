@@ -186,7 +186,8 @@ public class IntroScreen {
                     saveRecent(folder.getAbsolutePath());
                     javax.swing.SwingUtilities.invokeLater(() -> {
                         introFrame.dispose();
-                        new Nukepad(folder);
+                        Nukepad editor = new Nukepad(folder);
+                        editor.addToOpenedProjects(folder.getAbsolutePath());
                     });
                 }).start();
             }
@@ -299,7 +300,8 @@ public class IntroScreen {
                    new Thread(() -> {
                        javax.swing.SwingUtilities.invokeLater(() -> {
                        introFrame.dispose();
-                       new Nukepad(f);
+                       Nukepad editor = new Nukepad(f);
+                       editor.addToOpenedProjects(f.getAbsolutePath());
                    });
                 }).start();
             } else {

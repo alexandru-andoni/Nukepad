@@ -4,12 +4,12 @@
  */
 package com.adonis.Nukepad;
 
+import com.formdev.flatlaf.FlatDarculaLaf;
+import com.formdev.flatlaf.FlatIntelliJLaf;
 import java.awt.Color;
 import java.awt.Cursor;
 import java.awt.Dimension;
 import java.awt.Font;
-import java.awt.event.ActionEvent;
-import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
 import java.awt.event.MouseEvent;
 import java.io.BufferedReader;
@@ -23,7 +23,6 @@ import java.util.List;
 import javax.sound.sampled.AudioInputStream;
 import javax.sound.sampled.AudioSystem;
 import javax.sound.sampled.Clip;
-import javax.sound.sampled.UnsupportedAudioFileException;
 import javax.swing.BorderFactory;
 import javax.swing.Box;
 import javax.swing.BoxLayout;
@@ -35,6 +34,8 @@ import javax.swing.JLabel;
 import javax.swing.JPanel;
 import javax.swing.JSeparator;
 import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
 import javax.swing.border.EmptyBorder;
 
 /**
@@ -48,22 +49,31 @@ public class IntroScreen {
     );
     private static final int MAX_RECENTS = 8;
     public IntroScreen() {
+        try {
+            String savedTheme = loadTheme();
+            if (savedTheme.equals("dark")) {
+                UIManager.setLookAndFeel(new FlatDarculaLaf());
+            } else {
+                UIManager.setLookAndFeel(new FlatIntelliJLaf());
+            }
+        }catch (Exception e) {
+            e.printStackTrace();
+        }
         introFrame = new JFrame("Welcome to Nukepad!");
         ImageIcon icon = new ImageIcon(getClass().getResource("/icons/nukepadlogo.png"));
         introFrame.setIconImage(icon.getImage());
         introFrame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        introFrame.setSize(600, 500);
+        introFrame.setSize(700, 600);
         introFrame.setLocationRelativeTo(null);
         introFrame.setResizable(false);
-        
-        
-        
+       
         JPanel main = new JPanel();
         main.setLayout(new BoxLayout(main, BoxLayout.Y_AXIS));
         main.setBorder(new EmptyBorder(40, 40, 32, 40));
         main.setBackground(Color.WHITE);
+        introFrame.add(main);
         introFrame.setVisible(true);
-        playOpenSound();
+        new Thread(this::playOpenSound).start();
         
         JLabel logo;
         try {
@@ -95,6 +105,39 @@ public class IntroScreen {
         buttons.setBackground(Color.WHITE);
         buttons.setAlignmentX(JPanel.CENTER_ALIGNMENT);
         buttons.setMaximumSize(new Dimension(440, 40));
+        
+        JButton themeToggle = new JButton(loadTheme().equals("dark") ? "☀ Light Theme" : " 🌙 Dark Theme");
+        JPanel recentsPanel = new JPanel();
+        recentsPanel.setLayout(new BoxLayout(recentsPanel, BoxLayout.Y_AXIS));
+        recentsPanel.setBackground(UIManager.getColor("Panel.background"));
+        recentsPanel.setAlignmentX(JPanel.LEFT_ALIGNMENT);
+        recentsPanel.setMaximumSize(new Dimension(520, 999));
+        
+        themeToggle.setAlignmentX(JButton.CENTER_ALIGNMENT);
+        themeToggle.setFont(new Font("SansSerif", Font.PLAIN, 12));
+        themeToggle.addActionListener(e -> {
+            String current = loadTheme();
+            String next = current.equals("dark") ? "light" : "dark";
+            saveTheme(next);
+            try {
+                if (next.equals("dark")) {
+                    UIManager.setLookAndFeel(new FlatDarculaLaf());
+                    themeToggle.setText("☀ Light Theme");
+                } else {
+                    UIManager.setLookAndFeel(new FlatIntelliJLaf());
+                    themeToggle.setText("🌙 Dark Theme");
+                }
+                SwingUtilities.updateComponentTreeUI(introFrame);
+                
+                Color bg = UIManager.getColor("Panel.background");
+                main.setBackground(bg);
+                buttons.setBackground(bg);
+                recentsPanel.setBackground(bg);
+                introFrame.repaint();
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
+        });
         
         JButton openFile = new JButton("Open File");
         JButton openProject = new JButton("Open Project / Folder");
@@ -152,19 +195,27 @@ public class IntroScreen {
         buttons.add(Box.createHorizontalStrut(12));
         buttons.add(openProject);
         
-        JPanel recentsPanel = new JPanel();
-        recentsPanel.setLayout(new BoxLayout(recentsPanel, BoxLayout.Y_AXIS));
-        recentsPanel.setBackground(Color.WHITE);
-        recentsPanel.setAlignmentX(JPanel.LEFT_ALIGNMENT);
-        recentsPanel.setMaximumSize(new Dimension(520, 999));
+        main.add(buttons);
+        main.add(Box.createVerticalStrut(10));
+        main.add(themeToggle);
+        main.add(Box.createVerticalStrut(28));
+        main.add(new JSeparator(SwingConstants.HORIZONTAL));
+        
+        
+        
+        JPanel recentsPanel1 = new JPanel();
+        recentsPanel1.setLayout(new BoxLayout(recentsPanel1, BoxLayout.Y_AXIS));
+        recentsPanel1.setBackground(Color.WHITE);
+        recentsPanel1.setAlignmentX(JPanel.LEFT_ALIGNMENT);
+        recentsPanel1.setMaximumSize(new Dimension(520, 999));
         
         JLabel recentsTitle = new JLabel("Recent");
         recentsTitle.setFont(new Font("SansSerif", Font.PLAIN, 12));
         recentsTitle.setForeground(Color.GRAY);
         recentsTitle.setAlignmentX(JLabel.LEFT_ALIGNMENT);
         
-        recentsPanel.add(recentsTitle);
-        recentsPanel.add(Box.createVerticalStrut(8));
+        recentsPanel1.add(recentsTitle);
+        recentsPanel1.add(Box.createVerticalStrut(8));
         
         List <String> recents = loadRecents();
         if(recents.isEmpty()) {
@@ -172,13 +223,14 @@ public class IntroScreen {
             none.setFont(new Font("SansSerif", Font.PLAIN, 12));
             none.setForeground(Color.LIGHT_GRAY);
             none.setAlignmentX(JLabel.LEFT_ALIGNMENT);
-            recentsPanel.add(none);
+            recentsPanel1.add(none);
         } else {
             for (String path : recents) {
-                recentsPanel.add(buildRecentRow(path));
-                recentsPanel.add(Box.createVerticalStrut(2));
+                recentsPanel1.add(buildRecentRow(path));
+                recentsPanel1.add(Box.createVerticalStrut(2));
             }
         }
+        
         main.add(logo);
         main.add(Box.createVerticalStrut(14));
         main.add(title);
@@ -190,6 +242,10 @@ public class IntroScreen {
         main.add(new JSeparator(SwingConstants.HORIZONTAL));
         main.add(Box.createVerticalStrut(16));
         main.add(recentsPanel);
+        main.setBackground(UIManager.getColor("Panel.background"));
+        buttons.setBackground(UIManager.getColor("Panel.background"));
+        recentsPanel.setBackground(UIManager.getColor("Panel.background"));
+        
         
         introFrame.add(main);
         introFrame.setVisible(true);
@@ -202,6 +258,7 @@ public class IntroScreen {
         row.setMaximumSize(new Dimension(520, 36));
         row.setAlignmentX(JPanel.LEFT_ALIGNMENT);
         row.setCursor(Cursor.getPredefinedCursor(Cursor.HAND_CURSOR));
+        row.setBackground(UIManager.getColor("Panel.background"));
         
         File f = new File(path);
         boolean isDir = f.isDirectory();
@@ -224,11 +281,14 @@ public class IntroScreen {
             public void mouseEntered(MouseEvent e) {
                 row.setBackground(new Color(245, 245, 245));
                 nameLabel.setBackground(new Color(245, 245, 245));
+                row.setBackground(UIManager.getColor("Panel.background").darker());
+                nameLabel.setBackground(UIManager.getColor("Panel.background"). darker());
                 
             }
             @Override
             public void mouseExited(MouseEvent e) {
                 row.setBackground(Color.WHITE);
+                row.setBackground(UIManager.getColor("Panel background"));
             }
             @Override
             public void mouseClicked(MouseEvent e) {
@@ -261,7 +321,7 @@ public class IntroScreen {
         });
         return row;
     }
-        
+         
             
         
   private void saveRecent(String path) {
@@ -306,6 +366,25 @@ public class IntroScreen {
             
         } catch (Exception ex) {
             System.out.println("Could not play sound: " + ex.getMessage());
+        }
+    }
+    private static final File THEME_FILE = new File(
+            System.getProperty("user.home") + "/.nukepad_theme.txt"
+    );
+    private void saveTheme(String theme) {
+        try (BufferedWriter w = new BufferedWriter(new FileWriter(THEME_FILE))) {
+            w.write(theme);
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+    private String loadTheme() {
+        if(!THEME_FILE.exists()) return "light";
+        try(BufferedReader r = new BufferedReader(new FileReader(THEME_FILE))) {
+            String line = r.readLine();
+            return (line != null && !line.isBlank()) ? line.trim() : "light";
+        } catch (IOException ex) {
+            return "light";
         }
     }
     

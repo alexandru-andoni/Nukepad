@@ -4,16 +4,15 @@
 
 package com.adonis.Nukepad;
 
+import com.formdev.flatlaf.FlatDarkLaf;
+import com.formdev.flatlaf.FlatLightLaf;
+import com.formdev.flatlaf.FlatIntelliJLaf;
+import com.formdev.flatlaf.FlatDarculaLaf;
 import java.awt.BorderLayout;
-import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
-import java.awt.Font;
-import java.awt.GridBagConstraints;
-import java.awt.GridBagLayout;
-import java.awt.Insets;
 import java.awt.event.ActionEvent;
 import java.awt.event.ActionListener;
 import java.awt.event.MouseAdapter;
@@ -27,11 +26,9 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.net.URI;
 import java.nio.file.Files;
-import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.util.LinkedHashMap;
 import java.util.Map;
-import java.util.Properties;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import javax.swing.BorderFactory;
@@ -56,10 +53,11 @@ import javax.swing.JTextArea;
 import javax.swing.JTree;
 import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
+import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
+import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.plaf.metal.MetalLookAndFeel;
 import javax.swing.plaf.metal.OceanTheme;
-import javax.swing.tree.DefaultMutableTreeNode;
 import javax.tools.JavaCompiler;
 import javax.tools.ToolProvider;
 import org.fife.ui.autocomplete.AutoCompletion;
@@ -85,23 +83,31 @@ class Nukepad extends JFrame implements ActionListener{
     private File currentFile;
     
     Nukepad(File projectRoot) {
+        try {
+            ThemeManager.apply();
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         frame = new JFrame("Editor");
         ImageIcon icon = new ImageIcon(getClass().getResource("/icons/nukepadlogo.png"));
         frame.setIconImage(icon.getImage());
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        try{
-            UIManager.setLookAndFeel("javax.swing.plaf.metal.MetalLookAndFeel");
-            
-            MetalLookAndFeel.setCurrentTheme(new OceanTheme());
-        }catch(Exception e) {
-            e.printStackTrace();
-        }
+        
+        tabs = new JTabbedPane();
+        tabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
+        
         text = new RSyntaxTextArea();
         text.setCodeFoldingEnabled(true);
         text.setAntiAliasingEnabled(true);
+        applyEditorTheme(text);
         CompletionProvider provider = createCompletionProvider();
         AutoCompletion ac = new AutoCompletion(provider);
         ac.install(text);
+        
+        RTextScrollPane scroll = new RTextScrollPane(text);
+        scroll.setRowHeaderView(new LineNumberPanel(text));
+        tabs.addTab("Untitled", scroll);
+        
         JMenuBar menb = new JMenuBar();
         JMenu men1 = new JMenu("File");
         
@@ -133,6 +139,42 @@ class Nukepad extends JFrame implements ActionListener{
         menit7.addActionListener(this);
         menit8.addActionListener(this);
         
+        JMenu men3 = new JMenu("View");
+        JMenuItem darkTheme = new JMenuItem("Dark Theme");
+        JMenuItem lightTheme = new JMenuItem("Light Theme");
+        
+        darkTheme.addActionListener(e -> {
+           try {
+             
+               ThemeManager.save("dark");
+               clearThemeOverrides();
+               UIManager.setLookAndFeel(new FlatDarculaLaf());
+               applyThemeToAllTabs();
+               SwingUtilities.updateComponentTreeUI(frame);
+               frame.repaint();
+              
+           } catch (Exception ex) {
+               ex.printStackTrace();
+           }
+        });
+        
+        lightTheme.addActionListener(e -> {
+            try {
+                
+                ThemeManager.save("light");
+                clearThemeOverrides();
+                UIManager.setLookAndFeel(new FlatIntelliJLaf());
+                applyThemeToAllTabs();
+                SwingUtilities.updateComponentTreeUI(frame);
+                frame.repaint();
+            } catch(Exception ex) {
+                ex.printStackTrace();
+            }
+        });
+        men3.add(darkTheme);
+        men3.add(lightTheme);
+        menb.add(men3);
+        
         JButton button1 = new JButton("Compile");
         button1.addActionListener(this);
         
@@ -160,38 +202,59 @@ class Nukepad extends JFrame implements ActionListener{
         menb.add(button3);
         
         frame.setJMenuBar(menb);
-        RTextScrollPane scroll = new RTextScrollPane(text);
-        scroll.setRowHeaderView(new LineNumberPanel(text));
+        RTextScrollPane scroll2 = new RTextScrollPane(text);
+        scroll2.setRowHeaderView(new LineNumberPanel(text));
         tabs = new JTabbedPane();
         tabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
-        tabs.addTab("Untitled", scroll);
-        File rootDir = new File(System.getProperty("user.home"));
-        JTree tree = new FileTree(rootDir);
-        tree.setCellRenderer(new FileTreeCellRenderer());
-        JScrollPane treeScroll = new JScrollPane(tree);
-        JPanel categoriesPanel = buildCategoriesPanel();
-        JScrollPane categoriesScroll = new JScrollPane(categoriesPanel);
+        tabs.addTab("Untitled", scroll2);
         
-        SearchPanel searchPanel = new SearchPanel(new File("C:\\Users"));
-        searchPanel.setPreferredSize(new Dimension(280, 0));
-        searchPanel.setMinimumSize(new Dimension(100, 100));
-        JTabbedPane leftTabs = new JTabbedPane();
-        leftTabs.addTab("Files", treeScroll);
-        leftTabs.addTab("Search", searchPanel);
-        leftTabs.addTab("Categories", categoriesScroll);
-        leftTabs.setPreferredSize(new Dimension(280, 0));
-        
+        JLabel loadingLabel = new JLabel("Loading...", SwingConstants.CENTER);
         JSplitPane mainSplit = new JSplitPane (
             JSplitPane.HORIZONTAL_SPLIT,
-                leftTabs,
+            loadingLabel,
                 tabs
         );
         mainSplit.setDividerLocation(280);
-        
         frame.add(mainSplit, BorderLayout.CENTER);
         instance = this;
         frame.setSize(1280, 720);
         frame.setVisible(true);
+        new javax.swing.SwingWorker<JTabbedPane, Void>() {
+            @Override
+            protected JTabbedPane doInBackground() {
+                File rootDir = new File(System.getProperty("user.home"));
+                JTree tree = new FileTree(rootDir);
+                tree.setCellRenderer(new FileTreeCellRenderer());
+                JScrollPane treeScroll = new JScrollPane(tree);
+                
+                JPanel categoriesPanel = buildCategoriesPanel();
+                JScrollPane categoriesScroll = new JScrollPane(categoriesPanel);
+                
+                SearchPanel searchPanel = new SearchPanel(new File(System.getProperty("user.home")));
+                searchPanel.setPreferredSize(new Dimension(280, 0));
+                searchPanel.setMinimumSize(new Dimension(100, 100));
+                
+                JTabbedPane leftTabs = new JTabbedPane();
+                leftTabs.addTab("Files", treeScroll);
+                leftTabs.addTab("Search", searchPanel);
+                leftTabs.addTab("Categories", categoriesScroll);
+                leftTabs.setPreferredSize(new Dimension(280, 0));
+                return leftTabs;
+            }
+            @Override
+            protected void done() {
+                try {
+                    JTabbedPane leftTabs = get();
+                    mainSplit.setLeftComponent(leftTabs);
+                    mainSplit.setDividerLocation(280);
+                    
+                } catch (Exception ex) {
+                    ex.printStackTrace();
+                }
+            }
+            
+        }.execute();
+    
         
     }
     private static Nukepad instance;
@@ -347,6 +410,7 @@ class Nukepad extends JFrame implements ActionListener{
         RSyntaxTextArea editor = new RSyntaxTextArea();
         editor.setCodeFoldingEnabled(true);
         editor.setAntiAliasingEnabled(true);
+        applyEditorTheme(editor);
         String name= file.getName().toLowerCase();
         switch(name.substring(name.lastIndexOf('.') +1)) {
             case"java":
@@ -459,6 +523,41 @@ class Nukepad extends JFrame implements ActionListener{
         });
         return panel;
     }
+    private void applyThemeToAllTabs() {
+       for (int i = 0; i < tabs.getTabCount(); i++) {
+           Component c = tabs.getComponentAt(i);
+           if(c instanceof RTextScrollPane) {
+               RSyntaxTextArea editor = (RSyntaxTextArea) ((RTextScrollPane) c).getTextArea();
+               applyEditorTheme(editor);
+               
+           }
+       }
+   }
+    private void clearThemeOverrides() {
+        String[] keys = {
+         "Panel.background", "Panel.foreground", "Label.foreground",
+        "Button.background", "Button.foreground", "MenuBar.background",
+        "MenuBar.foreground", "Menu.background", "Menu.foreground",
+        "MenuItem.background", "MenuItem.foreground", "TabbedPane.background",
+        "TabbedPane.foreground", "ScrollPane.background", "ScrollBar.background",
+        "Tree.background", "Tree.foreground", "List.background", "List.foreground",
+        "SplitPane.background", "TextField.background", "TextField.foreground",
+        "TextArea.background", "TextArea.foreground"
+        };
+    for (String key : keys) UIManager.put(key, null);
+    }
+    private void applyEditorTheme(RSyntaxTextArea editor) {
+        try {
+            String themePath = ThemeManager.load().equals("dark")
+                    ? "/org/fife/ui/rsyntaxtextarea/themes/monokai.xml"
+                    : "/org/fife/ui/rsyntaxtextarea/themes/idea.xml";
+            org.fife.ui.rsyntaxtextarea.Theme theme = 
+                    org.fife.ui.rsyntaxtextarea.Theme.load(getClass().getResourceAsStream(themePath));
+            theme.apply(editor);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
 
     private JPanel buildCategorySection(
             String name,
@@ -528,6 +627,7 @@ class Nukepad extends JFrame implements ActionListener{
         
      return section;  
     }
-   
+    
+ 
     
 }

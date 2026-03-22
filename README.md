@@ -51,7 +51,7 @@ It's not trying to replace your IDE (and it won't, really). It's a passion (vibe
 
 ### v0.1.3 - alpha Patch $02
 
-- Fixed loading issues by transforming part of the loading processes into lazy loading
+- Fixed loading issues by replacing casual loading processes with lazy loading processes
 - Fixed the compiler producing garbage and the run button not executing properly
 - Added drag-n-drop and fixed some more bugs
 

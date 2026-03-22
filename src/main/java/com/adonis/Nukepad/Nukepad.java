@@ -234,16 +234,55 @@ class Nukepad extends JFrame implements ActionListener{
             @Override
             protected JTabbedPane doInBackground() {
                 File rootDir = new File(System.getProperty("user.home"));
-                JTree tree = new FileTree(rootDir);
+                DefaultMutableTreeNode rootNode = new DefaultMutableTreeNode(rootDir);
+                rootNode.add(new DefaultMutableTreeNode("Loading..."));
+                DefaultTreeModel treeModel = new DefaultTreeModel(rootNode);
+                JTree tree = new JTree(treeModel);
                 tree.setCellRenderer(new FileTreeCellRenderer());
+                tree.setRootVisible(true);
+                tree.setToggleClickCount(2);
+                javax.swing.SwingUtilities.invokeLater(() -> tree.collapseRow(0));
                 JScrollPane treeScroll = new JScrollPane(tree);
+                
+                
+                tree.addTreeExpansionListener(new javax.swing.event.TreeExpansionListener() {
+                    @Override
+                    public void treeExpanded(TreeExpansionEvent event) {
+                        DefaultMutableTreeNode node = (DefaultMutableTreeNode)
+                                event.getPath().getLastPathComponent();
+                        if(node.getChildCount() == 1 && node.getFirstChild().toString().equals("Loading...")) {
+                            node.removeAllChildren();
+                            File folder = (File) node.getUserObject();
+                            File[] children = folder.listFiles();
+                            if(children != null) {
+                                java.util.Arrays.sort(children, (a,b) -> {
+                                    if (a.isDirectory() && !b.isDirectory()) return -1;
+                                    if(!a.isDirectory() && b.isDirectory()) return 1;
+                                    return a.getName().compareToIgnoreCase(b.getName());
+                                });
+                                for (File child: children) {
+                                    DefaultMutableTreeNode childNode = new DefaultMutableTreeNode(child);
+                                    if(child.isDirectory()) {
+                                        childNode.add(new DefaultMutableTreeNode("Loading..."));
+                                    }
+                                    node.add(childNode);
+                                }
+                            }
+                            treeModel.reload(node);
+                        }
+                    }
+
+                    @Override
+                    public void treeCollapsed(javax.swing.event.TreeExpansionEvent event) {
+                        
+                    }
+                    
+                });
                 
                 JPanel categoriesPanel = buildCategoriesPanel();
                 JScrollPane categoriesScroll = new JScrollPane(categoriesPanel);
                 
-                SearchPanel searchPanel = new SearchPanel(new File(System.getProperty("user.home")));
-                searchPanel.setPreferredSize(new Dimension(280, 0));
-                searchPanel.setMinimumSize(new Dimension(100, 100));
+               
                 
                 JTree openedTree = new JTree(openedProjectsTreeModel);
                 openedTree.setCellRenderer(new FileTreeCellRenderer());
@@ -307,7 +346,7 @@ class Nukepad extends JFrame implements ActionListener{
                 
                 JTabbedPane leftTabs = new JTabbedPane();
                 leftTabs.addTab("Files", treeScroll);
-                leftTabs.addTab("Search", searchPanel);
+                leftTabs.addTab("Search", null);
                 leftTabs.addTab("Categories", categoriesScroll);
                 leftTabs.addTab("Opened Projects", openedScroll);
                 leftTabs.setPreferredSize(new Dimension(280, 0));
@@ -320,6 +359,23 @@ class Nukepad extends JFrame implements ActionListener{
                     JTabbedPane leftTabs = get();
                     mainSplit.setLeftComponent(leftTabs);
                     mainSplit.setDividerLocation(280);
+                    
+                JPanel searchPlaceholder = new JPanel(new BorderLayout());
+                searchPlaceholder.add(new JLabel("Click to load search", SwingConstants.CENTER));
+                leftTabs.setComponentAt(1, searchPlaceholder);
+               
+                leftTabs.addChangeListener(e -> {
+                    if(leftTabs.getSelectedIndex() == 1 &&
+                            leftTabs.getComponentAt(1) == searchPlaceholder) {
+                        SearchPanel sp = new SearchPanel(new File(System.getProperty("user.home")));
+                        sp.setPreferredSize(new Dimension(280, 0));
+                        sp.setMinimumSize(new Dimension(100, 100));
+                        leftTabs.setComponentAt(1, sp);
+                        leftTabs.revalidate();
+                        leftTabs.repaint();
+                    }
+                    
+                });
                     
                 } catch (Exception ex) {
                     ex.printStackTrace();
@@ -400,24 +456,29 @@ class Nukepad extends JFrame implements ActionListener{
                try {
                    Pattern pat = Pattern.compile("public\\s+class\\s+(\\w+)");
                    Matcher mat = pat.matcher(text.getText());
-                   if(mat.find()) {
-                       String className = mat.group(1);
+                   if(!mat.find()) {
+                       JOptionPane.showMessageDialog(frame, "No public class found in the editor!");
+                       return;
                    }
+                   String className = mat.group(1);
                    
-                   File file = new File(getClass() + ".java");
-                   try(FileWriter writer = new FileWriter(file)) {
+                   File file = new File(System.getProperty("user.home") + File.separator + className + ".java");
+                   try (FileWriter writer = new FileWriter(file)) {
                        writer.write(text.getText());
+                       
                    }
                    JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
                    if(compiler == null) {
-                       JOptionPane.showMessageDialog(frame, "No java compiler fould! Run this program using a JDK, not a JRE!");
+                       JOptionPane.showMessageDialog(frame, "No Java compiler found! Run this program using a JDK, not a JRE! ");
                        return;
                    }
+                   
                    int result = compiler.run(null, null, null, file.getPath());
                    if(result == 0) {
-                       JOptionPane.showMessageDialog(frame, "Compiler succesfully executed!");
+                       JOptionPane.showMessageDialog(frame, "Compiled succesfully! (" + className + ".class)");
+                       
                    } else {
-                       JOptionPane.showMessageDialog(frame, "Compiler failed!");
+                       JOptionPane.showMessageDialog(frame, "Compilation failed! Check that your code is valid.");
                    }
                } catch(Exception evt) {
                    JOptionPane.showMessageDialog(frame, evt.getMessage());
@@ -426,24 +487,36 @@ class Nukepad extends JFrame implements ActionListener{
                
            case "Run":
                try {
-                Process process = Runtime.getRuntime().exec("java"+ getClass());
-                BufferedReader input = new BufferedReader(new InputStreamReader(process.getInputStream()));
-                BufferedReader error = new BufferedReader(new InputStreamReader(process.getErrorStream()));
+                Pattern pat2 = Pattern.compile("public\\s+class\\s+(\\w+)");
+                Matcher mat2 = pat2.matcher(text.getText());
+             if (!mat2.find()) {
+                JOptionPane.showMessageDialog(frame, "No public class found in the editor!");
+                return;
+                }
+                String className2 = mat2.group(1);
+                String classDir = System.getProperty("user.home");
 
+                ProcessBuilder pb = new ProcessBuilder("java", "-cp", classDir, className2);
+                pb.redirectErrorStream(true);
+                Process process = pb.start();
+
+                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
                 StringBuilder output = new StringBuilder();
                 String line;
+                while ((line = reader.readLine()) != null) {
+                    output.append(line).append("\n");
+                }
+                process.waitFor();
 
-                while ((line = input.readLine()) != null) output.append(line).append("\n");
-                while ((line = error.readLine()) != null) output.append(line).append("\n");
+                JOptionPane.showMessageDialog(frame, 
+                    output.length() > 0 ? output.toString() : "(No output)");
 
-                JOptionPane.showMessageDialog(frame, output.toString());
-
-            } catch (Exception evt) {
-                JOptionPane.showMessageDialog(frame, evt.getMessage());
-            }
-            break;
+                    } catch (Exception evt) {
+                        JOptionPane.showMessageDialog(frame, evt.getMessage());
+                    }
+                    break;
            
-           default:
+            default:
                System.out.println("Unknown command:" + s);
         }
     }
@@ -533,6 +606,7 @@ class Nukepad extends JFrame implements ActionListener{
                 break;
             case"php":
                 editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_PHP);
+                break;
             default:
                 editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_NONE);
                 break;

@@ -46,8 +46,6 @@ It's not trying to replace your IDE (and it won't, really). It's a passion (vibe
 
 <img width="1262" height="706" alt="Screenshot 2026-03-22 205222" src="https://github.com/user-attachments/assets/0dd4202f-79b3-40c8-9938-70c19757cdf0" />
 
-player.play(AssetSource('assets/open.wav'));
-
 ---
 
 ## Updates

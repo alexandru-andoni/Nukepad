@@ -4,8 +4,11 @@
 
 package com.adonis.Nukepad;
 
-import com.formdev.flatlaf.FlatDarkLaf;
-import com.formdev.flatlaf.FlatLightLaf;
+import org.fife.ui.rsyntaxtextarea.parser.AbstractParser;
+import org.fife.ui.rsyntaxtextarea.parser.DefaultParseResult;
+import org.fife.ui.rsyntaxtextarea.parser.DefaultParserNotice;
+import org.fife.ui.rsyntaxtextarea.parser.ParseResult;
+import org.fife.ui.rsyntaxtextarea.parser.ParserNotice;
 import com.formdev.flatlaf.FlatIntelliJLaf;
 import com.formdev.flatlaf.FlatDarculaLaf;
 import java.awt.BorderLayout;
@@ -20,7 +23,6 @@ import java.awt.event.MouseEvent;
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
 import java.io.File;
-import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
@@ -55,10 +57,7 @@ import javax.swing.ListSelectionModel;
 import javax.swing.SwingConstants;
 import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
-import javax.swing.UnsupportedLookAndFeelException;
 import javax.swing.event.TreeExpansionEvent;
-import javax.swing.plaf.metal.MetalLookAndFeel;
-import javax.swing.plaf.metal.OceanTheme;
 import javax.swing.tree.DefaultMutableTreeNode;
 import javax.swing.tree.DefaultTreeModel;
 import javax.tools.JavaCompiler;
@@ -76,6 +75,9 @@ import org.fife.ui.rtextarea.RTextScrollPane;
  * @author croco
  */
 class Nukepad extends JFrame implements ActionListener{
+    private JSplitPane verticalSplit;
+    private boolean terminalVisible = true;
+    private int lastDividerLocation = 500;
 
     private DefaultTreeModel openedProjectsTreeModel = new DefaultTreeModel(new DefaultMutableTreeNode("Projects"));
     public static Nukepad getInstance() {
@@ -85,6 +87,9 @@ class Nukepad extends JFrame implements ActionListener{
     RSyntaxTextArea text;
     JFrame frame;
     private File currentFile;
+    private JTabbedPane bottomTabs;
+    private JTextArea terminalArea;
+    private javax.swing.table.DefaultTableModel problemsModel;
     
     Nukepad(File projectRoot) {
         try {
@@ -99,13 +104,12 @@ class Nukepad extends JFrame implements ActionListener{
         
         tabs = new JTabbedPane();
         tabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
-        
-        
-        
+       
         text = new RSyntaxTextArea();
         text.setCodeFoldingEnabled(true);
         text.setAntiAliasingEnabled(true);
         applyEditorTheme(text);
+        installLiveErrorParser(text);
         CompletionProvider provider = createCompletionProvider();
         AutoCompletion ac = new AutoCompletion(provider);
         ac.install(text);
@@ -157,6 +161,7 @@ class Nukepad extends JFrame implements ActionListener{
                clearThemeOverrides();
                UIManager.setLookAndFeel(new FlatDarculaLaf());
                applyThemeToAllTabs();
+               applyTerminalTheme();
                SwingUtilities.updateComponentTreeUI(frame);
                frame.repaint();
               
@@ -172,6 +177,7 @@ class Nukepad extends JFrame implements ActionListener{
                 clearThemeOverrides();
                 UIManager.setLookAndFeel(new FlatIntelliJLaf());
                 applyThemeToAllTabs();
+                applyTerminalTheme();
                 SwingUtilities.updateComponentTreeUI(frame);
                 frame.repaint();
             } catch(Exception ex) {
@@ -198,6 +204,9 @@ class Nukepad extends JFrame implements ActionListener{
                 }
             }
         });
+        
+        JButton buttonTerminal = new JButton("Terminal");
+        buttonTerminal.addActionListener(e -> toggleTerminal());
         men2.add(menit6);
         men2.add(menit7);
         men2.add(menit8);
@@ -207,6 +216,7 @@ class Nukepad extends JFrame implements ActionListener{
         menb.add(button1);
         menb.add(button2);
         menb.add(button3);
+        menb.add(buttonTerminal);
         
         frame.setJMenuBar(menb);
         RTextScrollPane scroll2 = new RTextScrollPane(text);
@@ -220,14 +230,22 @@ class Nukepad extends JFrame implements ActionListener{
         setupDragAndDrop(text);
         
         JLabel loadingLabel = new JLabel("Loading...", SwingConstants.CENTER);
+        verticalSplit = new JSplitPane (
+                JSplitPane.VERTICAL_SPLIT,
+                tabs,
+                buildBottomPanel()
+        );
+        verticalSplit.setResizeWeight(0.75);
+        
         JSplitPane mainSplit = new JSplitPane (
             JSplitPane.HORIZONTAL_SPLIT,
             loadingLabel,
-                tabs
+            verticalSplit
         );
         mainSplit.setDividerLocation(280);
         frame.add(mainSplit, BorderLayout.CENTER);
         instance = this;
+        
         frame.setSize(1280, 720);
         frame.setVisible(true);
         new javax.swing.SwingWorker<JTabbedPane, Void>() {
@@ -454,68 +472,145 @@ class Nukepad extends JFrame implements ActionListener{
                break;
            case"Compile":
                try {
-                   Pattern pat = Pattern.compile("public\\s+class\\s+(\\w+)");
-                   Matcher mat = pat.matcher(text.getText());
-                   if(!mat.find()) {
-                       JOptionPane.showMessageDialog(frame, "No public class found in the editor!");
+                   problemsModel.setRowCount(0);
+                   terminalArea.setText("");
+                   
+                   if(currentFile == null) {
+                       terminalArea.append("ERROR: Save your file first before compiling. \n");
+                       bottomTabs.setSelectedIndex(0);
                        return;
                    }
-                   String className = mat.group(1);
-                   
-                   File file = new File(System.getProperty("user.home") + File.separator + className + ".java");
-                   try (FileWriter writer = new FileWriter(file)) {
-                       writer.write(text.getText());
-                       
+                   String ext = currentFile.getName().contains(".")
+                           ? currentFile.getName().substring(currentFile.getName().lastIndexOf('.') +1 ).toLowerCase()
+                           : "";
+                   ProcessBuilder pbC;
+                   switch(ext) {
+                       case"java":
+                           pbC = new ProcessBuilder("javac", currentFile.getPath());
+                           break;
+                       case "cpp":
+                           pbC = new ProcessBuilder("g++", currentFile.getPath(), "-o",
+                           currentFile.getPath().replace(".cpp", ""));
+                           break;
+                           case"c":
+                               pbC = new ProcessBuilder("gcc", currentFile.getPath(), "-o",
+                               currentFile.getPath().replace(".c", ""));
+                               break;
+                           case "py":
+                               case"js":
+                                   case"ts":
+                                       case"tsx":
+                                            case"jsx":
+                                                terminalArea.append("ℹ️" + ext.toUpperCase() + "is interpreted, use Run instead.\n");
+                                                bottomTabs.setSelectedIndex(0);
+                                                return;
+                                            default:
+                                                terminalArea.append("ERROR: Compilation not supported for '.'" + ext + "'files.\n");
+                                                bottomTabs.setSelectedIndex(0);
+                                                return;   
                    }
-                   JavaCompiler compiler = ToolProvider.getSystemJavaCompiler();
-                   if(compiler == null) {
-                       JOptionPane.showMessageDialog(frame, "No Java compiler found! Run this program using a JDK, not a JRE! ");
-                       return;
-                   }
                    
-                   int result = compiler.run(null, null, null, file.getPath());
-                   if(result == 0) {
-                       JOptionPane.showMessageDialog(frame, "Compiled succesfully! (" + className + ".class)");
-                       
+                   pbC.redirectErrorStream(true);
+                   Process procC = pbC.start();
+                   BufferedReader readerC = new BufferedReader(new InputStreamReader(procC.getInputStream()));
+                   Pattern errorPat = Pattern.compile(".+:(\\d+): (error|warning): (.+)");
+                   String lineC;
+                   int errors = 0, warnings = 0;
+                   while((lineC = readerC.readLine()) != null) {
+                       terminalArea.append(lineC + "\n");
+                       Matcher m = errorPat.matcher(lineC);
+                       if (m.find()) {
+                           String lineNum = m.group(1);
+                           String type = m.group(2);
+                           String msg = m.group(3);
+                           String icon = type.equals("error") ? "❌" : "⚠️";
+                           problemsModel.addRow(new Object[] {icon, msg, lineNum, currentFile.getName()});
+                           if(type.equals("error")) errors++; else warnings++;
+                       }
+                   }
+                   procC.waitFor();
+                   if(procC.exitValue() == 0) {
+                       terminalArea.append("\n ✅ Build successful. \n");
+                       bottomTabs.setSelectedIndex(0);
                    } else {
-                       JOptionPane.showMessageDialog(frame, "Compilation failed! Check that your code is valid.");
+                       terminalArea.append("\n ❌ Build failed -" + errors + "error(s), " + warnings + "warning(s)\n");
+                       bottomTabs.setSelectedIndex(1);
                    }
+                   
                } catch(Exception evt) {
-                   JOptionPane.showMessageDialog(frame, evt.getMessage());
+                   terminalArea.append("Exception: " + evt.getMessage() + "\n");
+                   bottomTabs.setSelectedIndex(0);
                }
                break;
                
            case "Run":
-               try {
-                Pattern pat2 = Pattern.compile("public\\s+class\\s+(\\w+)");
-                Matcher mat2 = pat2.matcher(text.getText());
-             if (!mat2.find()) {
-                JOptionPane.showMessageDialog(frame, "No public class found in the editor!");
+              terminalArea.setText("");
+              bottomTabs.setSelectedIndex(0);
+
+            if (currentFile == null) {
+                terminalArea.append("ERROR: No file is currently open.\n");
+                break;
+            }
+
+            String ext2 = currentFile.getName().contains(".")
+                ? currentFile.getName().substring(currentFile.getName().lastIndexOf('.') + 1).toLowerCase()
+                : "";
+               String classDir = currentFile.getParent();
+                String baseName = currentFile.getName().replace("." + ext2, "");
+
+            ProcessBuilder pbR = null;
+            switch (ext2) {
+                case "java": pbR = new ProcessBuilder("java", "-cp", classDir, baseName); break;
+                case "py":pbR = new ProcessBuilder("python3", currentFile.getPath()); break;
+                case"ts":
+                case"tsx":
+                case"jsx":
+                case "js":   pbR = new ProcessBuilder("node", currentFile.getPath()); break;
+                case "cpp":
+                case "c":    pbR = new ProcessBuilder(currentFile.getPath().replace("." + ext2, "")); break;
+                default:
+                terminalArea.append("ERROR: Run not supported for '." + ext2 + "' files.\n");
                 return;
+            }
+            if(pbR == null) break;
+
+            final ProcessBuilder finalPb = pbR;
+            finalPb.redirectErrorStream(true);
+            finalPb.directory(new File(classDir));
+
+            new javax.swing.SwingWorker<Integer, String>() {
+                @Override
+            protected Integer doInBackground() throws Exception {
+            Process proc = finalPb.start();
+            BufferedReader reader = new BufferedReader(
+                new InputStreamReader(proc.getInputStream())
+            );
+            String line;
+            while ((line = reader.readLine()) != null) {
+                publish(line);  
+            }
+            return proc.waitFor();
+        }
+            @Override
+            protected void process(java.util.List<String> chunks) {
+            
+            for (String line : chunks) {
+                terminalArea.append(line + "\n");
+                terminalArea.setCaretPosition(terminalArea.getDocument().getLength());
+            }
+        }
+            @Override
+            protected void done() {
+                try {
+                    int exitCode = get();
+                    terminalArea.append("\n--- Process exited with code " + exitCode + " ---\n");
+                } catch (Exception ex) {
+                    terminalArea.append("Exception: " + ex.getMessage() + "\n");
                 }
-                String className2 = mat2.group(1);
-                String classDir = System.getProperty("user.home");
-
-                ProcessBuilder pb = new ProcessBuilder("java", "-cp", classDir, className2);
-                pb.redirectErrorStream(true);
-                Process process = pb.start();
-
-                BufferedReader reader = new BufferedReader(new InputStreamReader(process.getInputStream()));
-                StringBuilder output = new StringBuilder();
-                String line;
-                while ((line = reader.readLine()) != null) {
-                    output.append(line).append("\n");
-                }
-                process.waitFor();
-
-                JOptionPane.showMessageDialog(frame, 
-                    output.length() > 0 ? output.toString() : "(No output)");
-
-                    } catch (Exception evt) {
-                        JOptionPane.showMessageDialog(frame, evt.getMessage());
-                    }
-                    break;
-           
+            }
+        }.execute();
+              break;      
+                   
             default:
                System.out.println("Unknown command:" + s);
         }
@@ -559,6 +654,7 @@ class Nukepad extends JFrame implements ActionListener{
         editor.setCodeFoldingEnabled(true);
         editor.setAntiAliasingEnabled(true);
         applyEditorTheme(editor);
+        installLiveErrorParser(editor);
         String name= file.getName().toLowerCase();
         switch(name.substring(name.lastIndexOf('.') +1)) {
             case"java":
@@ -872,6 +968,163 @@ class Nukepad extends JFrame implements ActionListener{
         });
     }
 
- 
+    private Component buildBottomPanel() {
+       bottomTabs = new JTabbedPane();
+       
+       terminalArea = new JTextArea();
+       terminalArea.setEditable(false);
+       terminalArea.setFont(new java.awt.Font("Monospaced", java.awt.Font.PLAIN, 13));
+       applyTerminalTheme();
+       JScrollPane termScroll = new JScrollPane(terminalArea);
+       
+       String[] cols = {
+           "", "Description", "Line", "File"
+       };
+       problemsModel = new javax.swing.table.DefaultTableModel(cols, 0) {
+           public boolean isCellEditable(int r, int c) {
+               return false;
+           }
+       };
+       javax.swing.JTable problemsTable = new javax.swing.JTable(problemsModel);
+       problemsTable.getColumnModel().getColumn(0).setMaxWidth(30);
+       problemsTable.getColumnModel().getColumn(2).setMaxWidth(60);
+       
+       problemsTable.addMouseListener(new MouseAdapter() {
+           public void mouseClicked(MouseEvent e) {
+               int row = problemsTable.getSelectedRow();
+               if(row < 0) return;
+               Object lineVal = problemsModel.getValueAt(row, 2);
+               if(lineVal == null) return;
+               try {
+                   int line = Integer.parseInt(lineVal.toString());
+                   jumpToLine(text, line);
+               } catch (NumberFormatException igonored) {}
+           }
+           
+       });
+       bottomTabs.addTab("Terminal", termScroll);
+       bottomTabs.addTab("Problems", new JScrollPane(problemsTable));
+       
+       JPanel wrapper = new JPanel (new BorderLayout());
+       wrapper.setPreferredSize(new Dimension(0, 200));
+       wrapper.add(bottomTabs);
+       return wrapper;
+    }
+
+    private void applyTerminalTheme() {
+       boolean isDark = ThemeManager.load().equals("dark");
+       terminalArea.setBackground(isDark ? new Color(30, 30, 30) : new Color(255, 255, 255));
+       terminalArea.setForeground(isDark ? new Color(200, 200, 200) : new Color(30, 30, 30));
+       terminalArea.setCaretColor(isDark ? Color.WHITE : Color.BLACK);
+    }
+    
+    private void jumpToLine(RSyntaxTextArea editor, int line) {
+        try {
+            int offset = editor.getLineStartOffset(line -1);
+            editor.setCaretPosition(offset);
+            editor.requestFocusInWindow();
+            
+        } catch (javax.swing.text.BadLocationException ignored) {}
+    }
+
+    private void toggleTerminal() {
+        if (terminalVisible) {
+            lastDividerLocation = verticalSplit.getDividerLocation();
+            verticalSplit.getBottomComponent().setVisible(false);
+            verticalSplit.setDividerLocation(1.0);
+            terminalVisible = false;
+        } else {
+            verticalSplit.getBottomComponent().setVisible(true);
+            verticalSplit.setDividerLocation(lastDividerLocation);
+            terminalVisible = true;
+        }
+    }
+    
+    private void installLiveErrorParser(RSyntaxTextArea editor) {
+        editor.addParser(new AbstractParser() {
+        @Override
+        public ParseResult parse(org.fife.ui.rsyntaxtextarea.RSyntaxDocument doc, String style) {
+            DefaultParseResult result = new DefaultParseResult(this);
+            if (currentFile == null) return result;
+
+            String ext = currentFile.getName().contains(".")
+                ? currentFile.getName().substring(currentFile.getName().lastIndexOf('.') + 1).toLowerCase()
+                : "";
+
+            // Only parse supported compiled languages
+            if (!ext.equals("java") && !ext.equals("c") && !ext.equals("cpp")) return result;
+
+            try {
+                // Save current content to a temp file first
+                File tempFile = currentFile;
+                try (FileWriter fw = new FileWriter(tempFile)) {
+                    fw.write(editor.getText());
+                }
+
+                ProcessBuilder pb;
+                switch (ext) {
+                    case "java": 
+                        File tempOut = new File(System.getProperty("java.io.tmpdir"), "nukepad_compile_out");
+                        tempOut.mkdirs();
+                        pb = new ProcessBuilder("javac", "-d", tempOut.getAbsolutePath(), tempFile.getPath());
+                        break;
+                    case "cpp":  
+                        pb = new ProcessBuilder("g++", "-fsyntax-only", tempFile.getPath()); 
+                        break;
+                    case "c":  
+                        pb = new ProcessBuilder("gcc", "-fsyntax-only", tempFile.getPath());
+                        break;
+                    default: 
+                        return result;
+                }
+                pb.redirectErrorStream(true);
+                Process proc = pb.start();
+
+                BufferedReader reader = new BufferedReader(new InputStreamReader(proc.getInputStream()));
+                Pattern pat = Pattern.compile(".+:(\\d+): (error|warning): (.+)");
+                String line;
+
+                // Clear old problems
+                SwingUtilities.invokeLater(() -> problemsModel.setRowCount(0));
+
+                while ((line = reader.readLine()) != null) {
+                    Matcher m = pat.matcher(line);
+                    if (m.find()) {
+                        int lineNum = Integer.parseInt(m.group(1));
+                        String type = m.group(2);
+                        String msg  = m.group(3);
+
+                        // Add squiggle to editor
+                        DefaultParserNotice notice = new DefaultParserNotice(
+                            this, msg, lineNum - 1
+                        );
+                        notice.setLevel(type.equals("error")
+                            ? ParserNotice.Level.ERROR
+                            : ParserNotice.Level.WARNING);
+                        result.addNotice(notice);
+
+                        // Add to Problems table
+                        String icon = type.equals("error") ? "❌" : "⚠️";
+                        final String fMsg = msg;
+                        final int fLine = lineNum;
+                        SwingUtilities.invokeLater(() ->
+                            problemsModel.addRow(new Object[]{icon, fMsg, fLine, currentFile.getName()})
+                        );
+                    }
+                }
+                proc.waitFor();
+
+            } catch (Exception ex) {
+                
+            }
+            File tempOut2 = new File(System.getProperty("java.io.tmpdir"), "nukepad_compile_out");
+            File[] classFiles = tempOut2.listFiles((dir, name) -> name.endsWith(".class"));
+            if (classFiles != null) {
+                for (File cf : classFiles) cf.delete();
+            }
+            return result;
+        }
+    });
+}
     
 }

@@ -24,7 +24,7 @@ public class GitRunner {
         this.bottomTabs = bottomTabs;
     }
     
-    public void run(File workDir, String... args) {
+    public void run(File workDir, Runnable onComplete, String... args) {
         String[] cmd = new String[args.length + 1];
         cmd[0] = "git";
         System.arraycopy(args, 0, cmd, 1, args.length);
@@ -56,16 +56,22 @@ public class GitRunner {
             protected void done() {
                 try {
                     int code = get();
-                    terminalArea.append("\n--- git exited with code" + code + "---\n");
+                    terminalArea.append("\n--- git exited with code " + code + " ---\n");
                     bottomTabs.setSelectedIndex(0);
                     
                 } catch (Exception ex) {
                     terminalArea.append("Git error: " + ex.getMessage() + "\n");
-            
+                } finally {
+                    if (onComplete != null) {
+                        javax.swing.SwingUtilities.invokeLater(onComplete);
+                    }
+                }
             }
-            
-        }
-    }.execute();
+        }.execute();
+    }
+    
+    public void run(File workDir, String... args) {
+        run(workDir, null, args);
     }
     
 }

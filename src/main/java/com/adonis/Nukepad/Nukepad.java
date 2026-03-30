@@ -74,7 +74,7 @@ import org.fife.ui.rtextarea.RTextScrollPane;
  *
  * @author croco
  */
-class Nukepad extends JFrame implements ActionListener{
+class Nukepad extends JFrame implements ActionListener {
     private InteractiveTerminal interactiveTerminal;
     private CombinedProvider sharedProvider;
     private JSplitPane verticalSplit;
@@ -84,9 +84,13 @@ class Nukepad extends JFrame implements ActionListener{
     private GitPanel gitPanel;
 
     private DefaultTreeModel openedProjectsTreeModel = new DefaultTreeModel(new DefaultMutableTreeNode("Projects"));
+    private JTree fileTree;
+    private JTree openedProjectsTree;
+
     public static Nukepad getInstance() {
         return instance;
     }
+
     private JTabbedPane tabs;
     RSyntaxTextArea text;
     JFrame frame;
@@ -94,7 +98,7 @@ class Nukepad extends JFrame implements ActionListener{
     private JTabbedPane bottomTabs;
     private JTextArea terminalArea;
     private javax.swing.table.DefaultTableModel problemsModel;
-    
+
     Nukepad(File projectRoot) {
         try {
             ThemeManager.apply();
@@ -105,10 +109,10 @@ class Nukepad extends JFrame implements ActionListener{
         ImageIcon icon = new ImageIcon(getClass().getResource("/icons/nukepadlogo.png"));
         frame.setIconImage(icon.getImage());
         frame.setDefaultCloseOperation(JFrame.EXIT_ON_CLOSE);
-        
+
         tabs = new JTabbedPane();
         tabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
-       
+
         text = new RSyntaxTextArea();
         text.setCodeFoldingEnabled(true);
         text.setAntiAliasingEnabled(true);
@@ -122,63 +126,77 @@ class Nukepad extends JFrame implements ActionListener{
         RTextScrollPane scroll = new RTextScrollPane(text);
         scroll.setRowHeaderView(new LineNumberPanel(text));
         tabs.addTab("Untitled", scroll);
-        
-        
+
         JMenuBar menb = new JMenuBar();
         JMenu men1 = new JMenu("File");
-        
-        JMenuItem menit1 = new JMenuItem("New");
+
+        JMenu menit1 = new JMenu("New");
+        String[][] fileTypes = {
+                { "Java Class", "java",
+                        "public class %s {\n    public static void main(String[] args) {\n        System.out.println(\"Hello World!\");\n    }\n}\n" },
+                { "C++ Source", "cpp",
+                        "#include <iostream>\n\nint main() {\n    std::cout << \"Hello World!\" << std::endl;\n    return 0;\n}\n" },
+                { "C Source", "c",
+                        "#include <stdio.h>\n\nint main() {\n    printf(\"Hello World!\\n\");\n    return 0;\n}\n" },
+                { "Python Script", "py", "print('Hello World!')\n" },
+                { "JavaScript File", "js", "console.log('Hello World!');\n" },
+                { "TypeScript File", "ts", "console.log('Hello World!');\n" }
+        };
+        for (String[] type : fileTypes) {
+            JMenuItem item = new JMenuItem(type[0]);
+            item.addActionListener(e -> createNewLanguageFile(type[1], type[2]));
+            menit1.add(item);
+        }
+
         JMenuItem menit2 = new JMenuItem("Open");
         JMenuItem menit3 = new JMenuItem("Save");
         JMenuItem menit4 = new JMenuItem("Print");
         JMenuItem menit5 = new JMenuItem("Quit");
-        
-        menit1.addActionListener(this);
+
         menit2.addActionListener(this);
-        menit3.addActionListener(this);
         menit3.addActionListener(this);
         menit4.addActionListener(this);
         menit5.addActionListener(this);
-        
+
         men1.add(menit1);
         men1.add(menit2);
         men1.add(menit3);
         men1.add(menit4);
         men1.add(menit5);
-        
+
         JMenu men2 = new JMenu("Edit");
         JMenuItem menit6 = new JMenuItem("Cut");
         JMenuItem menit7 = new JMenuItem("Copy");
         JMenuItem menit8 = new JMenuItem("Paste");
-        
+
         menit6.addActionListener(this);
         menit7.addActionListener(this);
         menit8.addActionListener(this);
-        
+
         JMenu men3 = new JMenu("View");
         JMenuItem darkTheme = new JMenuItem("Dark Theme");
         JMenuItem lightTheme = new JMenuItem("Light Theme");
-        
+
         darkTheme.addActionListener(e -> {
-           try {
-             
-               ThemeManager.save("dark");
-               clearThemeOverrides();
-               UIManager.setLookAndFeel(new FlatDarculaLaf());
-               applyThemeToAllTabs();
-               applyTerminalTheme();
-               interactiveTerminal.applyTheme(true);
-               SwingUtilities.updateComponentTreeUI(frame);
-               frame.repaint();
-              
-           } catch (Exception ex) {
-               ex.printStackTrace();
-           }
+            try {
+
+                ThemeManager.save("dark");
+                clearThemeOverrides();
+                UIManager.setLookAndFeel(new FlatDarculaLaf());
+                applyThemeToAllTabs();
+                applyTerminalTheme();
+                interactiveTerminal.applyTheme(true);
+                SwingUtilities.updateComponentTreeUI(frame);
+                frame.repaint();
+
+            } catch (Exception ex) {
+                ex.printStackTrace();
+            }
         });
-        
+
         lightTheme.addActionListener(e -> {
             try {
-                
+
                 ThemeManager.save("light");
                 clearThemeOverrides();
                 UIManager.setLookAndFeel(new FlatIntelliJLaf());
@@ -187,20 +205,20 @@ class Nukepad extends JFrame implements ActionListener{
                 interactiveTerminal.applyTheme(true);
                 SwingUtilities.updateComponentTreeUI(frame);
                 frame.repaint();
-            } catch(Exception ex) {
+            } catch (Exception ex) {
                 ex.printStackTrace();
             }
         });
         men3.add(darkTheme);
         men3.add(lightTheme);
         menb.add(men3);
-        
+
         JButton button1 = new JButton("Compile");
         button1.addActionListener(this);
-        
+
         JButton button2 = new JButton("Run");
         button2.addActionListener(this);
-        
+
         JButton button3 = new JButton("Author's signature");
         button3.addActionListener(new ActionListener() {
             public void actionPerformed(ActionEvent e) {
@@ -211,84 +229,89 @@ class Nukepad extends JFrame implements ActionListener{
                 }
             }
         });
-        
+
         JButton buttonTerminal = new JButton("Terminal");
         buttonTerminal.addActionListener(e -> toggleTerminal());
         men2.add(menit6);
         men2.add(menit7);
         men2.add(menit8);
-        
+
         JMenu gitMenu = new JMenu("Git");
         String[][] gitActions = {
-              {"Init",   "init"},
-              {"Status", "status"},
-              {"Pull",   "pull"},
-              {"Push",   "push"},
-              {"Log",    "log", "--oneline", "-20"},
-              {"Diff",   "diff"},
-                          
+                { "Init", "init" },
+                { "Status", "status" },
+                { "Pull", "pull" },
+                { "Push", "push" },
+                { "Log", "log", "--oneline", "-20" },
+                { "Diff", "diff" },
+
         };
-        for(String[] action : gitActions) {
+        for (String[] action : gitActions) {
             JMenuItem item = new JMenuItem(action[0]);
             String[] args = Arrays.copyOfRange(action, 1, action.length);
             item.addActionListener(e -> {
-                File dir = currentFile != null ? currentFile.getParentFile()
-                        : new File(System.getProperty("user.home"));
-                gitRunner.run(dir, args);
+                File dir = getSelectedDirectory();
+                gitRunner.run(dir, () -> {
+                    if (gitPanel != null) {
+                        gitPanel.setRepoDir(dir);
+                    }
+                }, args);
             });
             gitMenu.add(item);
         }
-        
+
         JMenu branchMenu = new JMenu("Branch");
         JMenuItem newBranch = new JMenu("New branch...");
         newBranch.addActionListener(e -> {
             String name = JOptionPane.showInputDialog(frame, "Branch name:");
-            if (name != null && !name.isBlank())
-                gitRunner.run(currentFile != null ? currentFile.getParentFile()
-                        : new File(System.getProperty("user.home")),
-                        "checkout", "-b", name);
+            if (name != null && !name.isBlank()) {
+                File dir = getSelectedDirectory();
+                gitRunner.run(dir, () -> {
+                    if (gitPanel != null) {
+                        gitPanel.setRepoDir(dir);
+                    }
+                }, "checkout", "-b", name);
+            }
         });
         branchMenu.add(newBranch);
         gitMenu.add(branchMenu);
         menb.add(gitMenu);
-        
+
         menb.add(men1);
         menb.add(men2);
         menb.add(button1);
         menb.add(button2);
         menb.add(button3);
         menb.add(buttonTerminal);
-        
+
         frame.setJMenuBar(menb);
         RTextScrollPane scroll2 = new RTextScrollPane(text);
         scroll2.setRowHeaderView(new LineNumberPanel(text));
         tabs = new JTabbedPane();
         tabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
         tabs.addTab("Untitled", scroll2);
-        
+
         setupDragAndDrop(tabs);
         setupDragAndDrop(scroll2);
         setupDragAndDrop(text);
-        
+
         JLabel loadingLabel = new JLabel("Loading...", SwingConstants.CENTER);
-        verticalSplit = new JSplitPane (
+        verticalSplit = new JSplitPane(
                 JSplitPane.VERTICAL_SPLIT,
                 tabs,
-                buildBottomPanel()
-        );
+                buildBottomPanel());
         gitRunner = new GitRunner(terminalArea, bottomTabs);
         gitPanel = new GitPanel(gitRunner);
         verticalSplit.setResizeWeight(0.75);
-        
-        JSplitPane mainSplit = new JSplitPane (
-            JSplitPane.HORIZONTAL_SPLIT,
-            loadingLabel,
-            verticalSplit
-        );
+
+        JSplitPane mainSplit = new JSplitPane(
+                JSplitPane.HORIZONTAL_SPLIT,
+                loadingLabel,
+                verticalSplit);
         mainSplit.setDividerLocation(280);
         frame.add(mainSplit, BorderLayout.CENTER);
         instance = this;
-        
+
         frame.setSize(1280, 720);
         frame.setVisible(true);
         new javax.swing.SwingWorker<JTabbedPane, Void>() {
@@ -298,32 +321,39 @@ class Nukepad extends JFrame implements ActionListener{
                 DefaultMutableTreeNode rootNode = new DefaultMutableTreeNode(rootDir);
                 rootNode.add(new DefaultMutableTreeNode("Loading..."));
                 DefaultTreeModel treeModel = new DefaultTreeModel(rootNode);
-                JTree tree = new JTree(treeModel);
-                tree.setCellRenderer(new FileTreeCellRenderer());
-                tree.setRootVisible(true);
-                tree.setToggleClickCount(2);
-                javax.swing.SwingUtilities.invokeLater(() -> tree.collapseRow(0));
-                JScrollPane treeScroll = new JScrollPane(tree);
-                
-                
-                tree.addTreeExpansionListener(new javax.swing.event.TreeExpansionListener() {
+                fileTree = new JTree(treeModel);
+                fileTree.setCellRenderer(new FileTreeCellRenderer());
+                fileTree.setRootVisible(true);
+                fileTree.setToggleClickCount(2);
+                javax.swing.SwingUtilities.invokeLater(() -> fileTree.collapseRow(0));
+                JScrollPane treeScroll = new JScrollPane(fileTree);
+
+                fileTree.addTreeSelectionListener(e -> {
+                    File dir = getSelectedDirectory();
+                    if (gitPanel != null && dir != null) {
+                        gitPanel.setRepoDir(dir);
+                    }
+                });
+
+                fileTree.addTreeExpansionListener(new javax.swing.event.TreeExpansionListener() {
                     @Override
                     public void treeExpanded(TreeExpansionEvent event) {
-                        DefaultMutableTreeNode node = (DefaultMutableTreeNode)
-                                event.getPath().getLastPathComponent();
-                        if(node.getChildCount() == 1 && node.getFirstChild().toString().equals("Loading...")) {
+                        DefaultMutableTreeNode node = (DefaultMutableTreeNode) event.getPath().getLastPathComponent();
+                        if (node.getChildCount() == 1 && node.getFirstChild().toString().equals("Loading...")) {
                             node.removeAllChildren();
                             File folder = (File) node.getUserObject();
                             File[] children = folder.listFiles();
-                            if(children != null) {
-                                java.util.Arrays.sort(children, (a,b) -> {
-                                    if (a.isDirectory() && !b.isDirectory()) return -1;
-                                    if(!a.isDirectory() && b.isDirectory()) return 1;
+                            if (children != null) {
+                                java.util.Arrays.sort(children, (a, b) -> {
+                                    if (a.isDirectory() && !b.isDirectory())
+                                        return -1;
+                                    if (!a.isDirectory() && b.isDirectory())
+                                        return 1;
                                     return a.getName().compareToIgnoreCase(b.getName());
                                 });
-                                for (File child: children) {
+                                for (File child : children) {
                                     DefaultMutableTreeNode childNode = new DefaultMutableTreeNode(child);
-                                    if(child.isDirectory()) {
+                                    if (child.isDirectory()) {
                                         childNode.add(new DefaultMutableTreeNode("Loading..."));
                                     }
                                     node.add(childNode);
@@ -335,62 +365,71 @@ class Nukepad extends JFrame implements ActionListener{
 
                     @Override
                     public void treeCollapsed(javax.swing.event.TreeExpansionEvent event) {
-                        
+
                     }
-                    
+
                 });
-                
+
                 JPanel categoriesPanel = buildCategoriesPanel();
                 JScrollPane categoriesScroll = new JScrollPane(categoriesPanel);
-                
-               
-                
-                JTree openedTree = new JTree(openedProjectsTreeModel);
-                openedTree.setCellRenderer(new FileTreeCellRenderer());
-                openedTree.setRootVisible(false);
-                openedTree.addMouseListener(new MouseAdapter() {
+
+                openedProjectsTree = new JTree(openedProjectsTreeModel);
+                openedProjectsTree.setCellRenderer(new FileTreeCellRenderer());
+                openedProjectsTree.setRootVisible(false);
+                openedProjectsTree.addMouseListener(new MouseAdapter() {
                     @Override
                     public void mouseClicked(MouseEvent e) {
-                      if(e.getClickCount() == 2) {
-                          int row = openedTree.getRowForLocation(e.getX(), e.getY());
-                          if(row < 0) return;
-                          javax.swing.tree.TreePath treePath = openedTree.getPathForRow(row);
-                          if (treePath == null) return;
-                          DefaultMutableTreeNode node = (DefaultMutableTreeNode) treePath.getLastPathComponent();
-                          Object userObj = node.getUserObject();
-                          if (!(userObj instanceof File)) return;
-                          File clicked = (File) userObj;
-                          if(clicked.isDirectory()) return;
-                          try {
-                              String content = new String(Files.readAllBytes(clicked.toPath()));
-                              openFileInNewTab(clicked, content);
-                          } catch (IOException ex) {
-                              ex.printStackTrace();
-                          }
-                      }  
+                        if (e.getClickCount() == 2) {
+                            int row = openedProjectsTree.getRowForLocation(e.getX(), e.getY());
+                            if (row < 0)
+                                return;
+                            javax.swing.tree.TreePath treePath = openedProjectsTree.getPathForRow(row);
+                            if (treePath == null)
+                                return;
+                            DefaultMutableTreeNode node = (DefaultMutableTreeNode) treePath.getLastPathComponent();
+                            Object userObj = node.getUserObject();
+                            if (!(userObj instanceof File))
+                                return;
+                            File clicked = (File) userObj;
+                            if (clicked.isDirectory())
+                                return;
+                            try {
+                                String content = new String(Files.readAllBytes(clicked.toPath()));
+                                openFileInNewTab(clicked, content);
+                            } catch (IOException ex) {
+                                ex.printStackTrace();
+                            }
+                        }
                     }
                 });
-               JScrollPane openedScroll = new JScrollPane(openedTree);
-               openedTree.setRootVisible(false);
-                openedTree.addTreeExpansionListener(new javax.swing.event.TreeExpansionListener() {
+                openedProjectsTree.addTreeSelectionListener(e -> {
+                    File dir = getSelectedDirectory();
+                    if (gitPanel != null && dir != null) {
+                        gitPanel.setRepoDir(dir);
+                    }
+                });
+                JScrollPane openedScroll = new JScrollPane(openedProjectsTree);
+                openedProjectsTree.setRootVisible(false);
+                openedProjectsTree.addTreeExpansionListener(new javax.swing.event.TreeExpansionListener() {
                     @Override
                     public void treeExpanded(javax.swing.event.TreeExpansionEvent event) {
-                        DefaultMutableTreeNode node = (DefaultMutableTreeNode)
-                                event.getPath().getLastPathComponent();
-                        
-                        if(node.getChildCount() == 1 && node.getFirstChild().toString().equals("Loading...")) {
+                        DefaultMutableTreeNode node = (DefaultMutableTreeNode) event.getPath().getLastPathComponent();
+
+                        if (node.getChildCount() == 1 && node.getFirstChild().toString().equals("Loading...")) {
                             node.removeAllChildren();
                             File folder = (File) node.getUserObject();
                             File[] children = folder.listFiles();
-                            if(children != null) {
-                                java.util.Arrays.sort(children, (a,b) -> {
-                                    if(a.isDirectory() && !b.isDirectory()) return -1;
-                                    if(!a.isDirectory() && b.isDirectory()) return 1;
+                            if (children != null) {
+                                java.util.Arrays.sort(children, (a, b) -> {
+                                    if (a.isDirectory() && !b.isDirectory())
+                                        return -1;
+                                    if (!a.isDirectory() && b.isDirectory())
+                                        return 1;
                                     return a.getName().compareToIgnoreCase(b.getName());
                                 });
                                 for (File child : children) {
                                     DefaultMutableTreeNode childNode = new DefaultMutableTreeNode(child);
-                                    if(child.isDirectory()) {
+                                    if (child.isDirectory()) {
                                         childNode.add(new DefaultMutableTreeNode("Loading..."));
                                     }
                                     node.add(childNode);
@@ -404,7 +443,7 @@ class Nukepad extends JFrame implements ActionListener{
                     public void treeCollapsed(TreeExpansionEvent event) {
                     }
                 });
-                
+
                 JTabbedPane leftTabs = new JTabbedPane();
                 leftTabs.addTab("Files", treeScroll);
                 leftTabs.addTab("Search", null);
@@ -413,264 +452,278 @@ class Nukepad extends JFrame implements ActionListener{
                 leftTabs.addTab("Git", gitPanel);
                 leftTabs.setPreferredSize(new Dimension(280, 0));
                 return leftTabs;
-               
+
             }
+
             @Override
             protected void done() {
                 try {
                     JTabbedPane leftTabs = get();
                     mainSplit.setLeftComponent(leftTabs);
                     mainSplit.setDividerLocation(280);
-                    
-                JPanel searchPlaceholder = new JPanel(new BorderLayout());
-                searchPlaceholder.add(new JLabel("Click to load search", SwingConstants.CENTER));
-                leftTabs.setComponentAt(1, searchPlaceholder);
-               
-                leftTabs.addChangeListener(e -> {
-                    if(leftTabs.getSelectedIndex() == 1 &&
-                            leftTabs.getComponentAt(1) == searchPlaceholder) {
-                        SearchPanel sp = new SearchPanel(new File(System.getProperty("user.home")));
-                        sp.setPreferredSize(new Dimension(280, 0));
-                        sp.setMinimumSize(new Dimension(100, 100));
-                        leftTabs.setComponentAt(1, sp);
-                        leftTabs.revalidate();
-                        leftTabs.repaint();
-                    }
-                    
-                });
-                    
+
+                    JPanel searchPlaceholder = new JPanel(new BorderLayout());
+                    searchPlaceholder.add(new JLabel("Click to load search", SwingConstants.CENTER));
+                    leftTabs.setComponentAt(1, searchPlaceholder);
+
+                    leftTabs.addChangeListener(e -> {
+                        if (leftTabs.getSelectedIndex() == 1 &&
+                                leftTabs.getComponentAt(1) == searchPlaceholder) {
+                            SearchPanel sp = new SearchPanel(new File(System.getProperty("user.home")));
+                            sp.setPreferredSize(new Dimension(280, 0));
+                            sp.setMinimumSize(new Dimension(100, 100));
+                            leftTabs.setComponentAt(1, sp);
+                            leftTabs.revalidate();
+                            leftTabs.repaint();
+                        }
+
+                    });
+
                 } catch (Exception ex) {
                     ex.printStackTrace();
                 }
             }
-            
+
         }.execute();
-    
-        
+
     }
+
     private static Nukepad instance;
 
     @Override
     public void actionPerformed(ActionEvent e) {
         String s = e.getActionCommand();
-        switch(s) {
-           case"Cut":
-               text.cut();
-               break;
-           case"Copy":
-               text.copy();
-               break;
-           case"Paste":
-               text.paste();
-               break;
-           case"Save":
-               JFileChooser jSave = new JFileChooser("f:");
-               int rSave = jSave.showSaveDialog(null);
-               
-               if(rSave == JFileChooser.APPROVE_OPTION) {
-                   File file = new File(jSave.getSelectedFile().getAbsolutePath());
-                   try(BufferedWriter writer = new BufferedWriter(new FileWriter(file, false))) {
-                       writer.write(text.getText());
-                   } catch (Exception evt) {
-                       JOptionPane.showMessageDialog(frame, evt.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-                   }
-               } else {
-                   JOptionPane.showMessageDialog(frame, "The user has cancelled the operation!");
-               }
-               break;
-           case "Print":
-               try {
-                   text.print();
-               } catch(Exception evt) {
-                   JOptionPane.showMessageDialog(frame, evt.getMessage());
-               }
-               break;
-           case "Open":
-               JFileChooser jOpen = new JFileChooser(System.getProperty("user.home"));
-               jOpen.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
-               int rOpen = jOpen.showOpenDialog(null);
-               if (rOpen == JFileChooser.APPROVE_OPTION) {
-                   File file = jOpen.getSelectedFile();
-                   if(file.isDirectory()) {
-                       addToOpenedProjects(file.getAbsolutePath());
-                   } else {
-                       try {
-                           String content = new String(Files.readAllBytes(file.toPath()));
-                           openFileInNewTab(file, content);
-                       } catch (Exception evt) {
-                           JOptionPane.showMessageDialog(frame,evt.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
-                       }
-                   }
-                   
-               } else {
-                   JOptionPane.showMessageDialog(frame, "The user has cancelled the operation!");
-               }
-               break;
-           case"New":
-               text.setText("");
-               break;
-           case"Quit":
-               frame.setVisible(false);
-               break;
-           case"Compile":
-               try {
-                   problemsModel.setRowCount(0);
-                   terminalArea.setText("");
-                   
-                   if(currentFile == null) {
-                       terminalArea.append("ERROR: Save your file first before compiling. \n");
-                       bottomTabs.setSelectedIndex(0);
-                       return;
-                   }
-                   String ext = currentFile.getName().contains(".")
-                           ? currentFile.getName().substring(currentFile.getName().lastIndexOf('.') +1 ).toLowerCase()
-                           : "";
-                   ProcessBuilder pbC;
-                   switch(ext) {
-                       case"java":
-                           pbC = new ProcessBuilder("javac", currentFile.getPath());
-                           break;
-                       case "cpp":
-                           pbC = new ProcessBuilder("g++", currentFile.getPath(), "-o",
-                           currentFile.getPath().replace(".cpp", ""));
-                           break;
-                           case"c":
-                               pbC = new ProcessBuilder("gcc", currentFile.getPath(), "-o",
-                               currentFile.getPath().replace(".c", ""));
-                               break;
-                           case "py":
-                               case"js":
-                                   case"ts":
-                                       case"tsx":
-                                            case"jsx":
-                                                terminalArea.append("ℹ️" + ext.toUpperCase() + "is interpreted, use Run instead.\n");
-                                                bottomTabs.setSelectedIndex(0);
-                                                return;
-                                            default:
-                                                terminalArea.append("ERROR: Compilation not supported for '.'" + ext + "'files.\n");
-                                                bottomTabs.setSelectedIndex(0);
-                                                return;   
-                   }
-                   
-                   pbC.redirectErrorStream(true);
-                   Process procC = pbC.start();
-                   BufferedReader readerC = new BufferedReader(new InputStreamReader(procC.getInputStream()));
-                   Pattern errorPat = Pattern.compile(".+:(\\d+): (error|warning): (.+)");
-                   String lineC;
-                   int errors = 0, warnings = 0;
-                   while((lineC = readerC.readLine()) != null) {
-                       terminalArea.append(lineC + "\n");
-                       Matcher m = errorPat.matcher(lineC);
-                       if (m.find()) {
-                           String lineNum = m.group(1);
-                           String type = m.group(2);
-                           String msg = m.group(3);
-                           String icon = type.equals("error") ? "❌" : "⚠️";
-                           problemsModel.addRow(new Object[] {icon, msg, lineNum, currentFile.getName()});
-                           if(type.equals("error")) errors++; else warnings++;
-                       }
-                   }
-                   procC.waitFor();
-                   if(procC.exitValue() == 0) {
-                       terminalArea.append("\n ✅ Build successful. \n");
-                       bottomTabs.setSelectedIndex(0);
-                   } else {
-                       terminalArea.append("\n ❌ Build failed -" + errors + "error(s), " + warnings + "warning(s)\n");
-                       bottomTabs.setSelectedIndex(1);
-                   }
-                   
-               } catch(Exception evt) {
-                   terminalArea.append("Exception: " + evt.getMessage() + "\n");
-                   bottomTabs.setSelectedIndex(0);
-               }
-               break;
-               
-           case "Run":
-              terminalArea.setText("");
-              bottomTabs.setSelectedIndex(0);
-
-            if (currentFile == null) {
-                terminalArea.append("ERROR: No file is currently open.\n");
+        switch (s) {
+            case "Cut":
+                text.cut();
                 break;
-            }
+            case "Copy":
+                text.copy();
+                break;
+            case "Paste":
+                text.paste();
+                break;
+            case "Save":
+                JFileChooser jSave = new JFileChooser("f:");
+                int rSave = jSave.showSaveDialog(null);
 
-            String ext2 = currentFile.getName().contains(".")
-                ? currentFile.getName().substring(currentFile.getName().lastIndexOf('.') + 1).toLowerCase()
-                : "";
-               String classDir = currentFile.getParent();
+                if (rSave == JFileChooser.APPROVE_OPTION) {
+                    File file = new File(jSave.getSelectedFile().getAbsolutePath());
+                    try (BufferedWriter writer = new BufferedWriter(new FileWriter(file, false))) {
+                        writer.write(text.getText());
+                    } catch (Exception evt) {
+                        JOptionPane.showMessageDialog(frame, evt.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                    }
+                } else {
+                    JOptionPane.showMessageDialog(frame, "The user has cancelled the operation!");
+                }
+                break;
+            case "Print":
+                try {
+                    text.print();
+                } catch (Exception evt) {
+                    JOptionPane.showMessageDialog(frame, evt.getMessage());
+                }
+                break;
+            case "Open":
+                JFileChooser jOpen = new JFileChooser(System.getProperty("user.home"));
+                jOpen.setFileSelectionMode(JFileChooser.FILES_AND_DIRECTORIES);
+                int rOpen = jOpen.showOpenDialog(null);
+                if (rOpen == JFileChooser.APPROVE_OPTION) {
+                    File file = jOpen.getSelectedFile();
+                    if (file.isDirectory()) {
+                        addToOpenedProjects(file.getAbsolutePath());
+                    } else {
+                        try {
+                            String content = new String(Files.readAllBytes(file.toPath()));
+                            openFileInNewTab(file, content);
+                        } catch (Exception evt) {
+                            JOptionPane.showMessageDialog(frame, evt.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+                        }
+                    }
+
+                } else {
+                    JOptionPane.showMessageDialog(frame, "The user has cancelled the operation!");
+                }
+                break;
+            case "Quit":
+                frame.setVisible(false);
+                break;
+            case "Compile":
+                try {
+                    problemsModel.setRowCount(0);
+                    terminalArea.setText("");
+
+                    if (currentFile == null) {
+                        terminalArea.append("ERROR: Save your file first before compiling. \n");
+                        bottomTabs.setSelectedIndex(0);
+                        return;
+                    }
+                    String ext = currentFile.getName().contains(".")
+                            ? currentFile.getName().substring(currentFile.getName().lastIndexOf('.') + 1).toLowerCase()
+                            : "";
+                    ProcessBuilder pbC;
+                    switch (ext) {
+                        case "java":
+                            pbC = new ProcessBuilder("javac", currentFile.getPath());
+                            break;
+                        case "cpp":
+                            pbC = new ProcessBuilder("g++", currentFile.getPath(), "-o",
+                                    currentFile.getPath().replace(".cpp", ""));
+                            break;
+                        case "c":
+                            pbC = new ProcessBuilder("gcc", currentFile.getPath(), "-o",
+                                    currentFile.getPath().replace(".c", ""));
+                            break;
+                        case "py":
+                        case "js":
+                        case "ts":
+                        case "tsx":
+                        case "jsx":
+                            terminalArea.append("ℹ️" + ext.toUpperCase() + "is interpreted, use Run instead.\n");
+                            bottomTabs.setSelectedIndex(0);
+                            return;
+                        default:
+                            terminalArea.append("ERROR: Compilation not supported for '.'" + ext + "'files.\n");
+                            bottomTabs.setSelectedIndex(0);
+                            return;
+                    }
+
+                    pbC.redirectErrorStream(true);
+                    Process procC = pbC.start();
+                    BufferedReader readerC = new BufferedReader(new InputStreamReader(procC.getInputStream()));
+                    Pattern errorPat = Pattern.compile(".+:(\\d+): (error|warning): (.+)");
+                    String lineC;
+                    int errors = 0, warnings = 0;
+                    while ((lineC = readerC.readLine()) != null) {
+                        terminalArea.append(lineC + "\n");
+                        Matcher m = errorPat.matcher(lineC);
+                        if (m.find()) {
+                            String lineNum = m.group(1);
+                            String type = m.group(2);
+                            String msg = m.group(3);
+                            String icon = type.equals("error") ? "❌" : "⚠️";
+                            problemsModel.addRow(new Object[] { icon, msg, lineNum, currentFile.getName() });
+                            if (type.equals("error"))
+                                errors++;
+                            else
+                                warnings++;
+                        }
+                    }
+                    procC.waitFor();
+                    if (procC.exitValue() == 0) {
+                        terminalArea.append("\n ✅ Build successful. \n");
+                        bottomTabs.setSelectedIndex(0);
+                    } else {
+                        terminalArea.append("\n ❌ Build failed -" + errors + "error(s), " + warnings + "warning(s)\n");
+                        bottomTabs.setSelectedIndex(1);
+                    }
+
+                } catch (Exception evt) {
+                    terminalArea.append("Exception: " + evt.getMessage() + "\n");
+                    bottomTabs.setSelectedIndex(0);
+                }
+                break;
+
+            case "Run":
+                terminalArea.setText("");
+                bottomTabs.setSelectedIndex(0);
+
+                if (currentFile == null) {
+                    terminalArea.append("ERROR: No file is currently open.\n");
+                    break;
+                }
+
+                String ext2 = currentFile.getName().contains(".")
+                        ? currentFile.getName().substring(currentFile.getName().lastIndexOf('.') + 1).toLowerCase()
+                        : "";
+                String classDir = currentFile.getParent();
                 String baseName = currentFile.getName().replace("." + ext2, "");
 
-            ProcessBuilder pbR = null;
-            switch (ext2) {
-                case "java": pbR = new ProcessBuilder("java", "-cp", classDir, baseName); break;
-                case "py":pbR = new ProcessBuilder("python3", currentFile.getPath()); break;
-                case"ts":
-                case"tsx":
-                case"jsx":
-                case "js":   pbR = new ProcessBuilder("node", currentFile.getPath()); break;
-                case "cpp":
-                case "c":    pbR = new ProcessBuilder(currentFile.getPath().replace("." + ext2, "")); break;
-                default:
-                terminalArea.append("ERROR: Run not supported for '." + ext2 + "' files.\n");
-                return;
-            }
-            if(pbR == null) break;
-
-            final ProcessBuilder finalPb = pbR;
-            finalPb.redirectErrorStream(true);
-            finalPb.directory(new File(classDir));
-
-            new javax.swing.SwingWorker<Integer, String>() {
-                @Override
-            protected Integer doInBackground() throws Exception {
-            Process proc = finalPb.start();
-            BufferedReader reader = new BufferedReader(
-                new InputStreamReader(proc.getInputStream())
-            );
-            String line;
-            while ((line = reader.readLine()) != null) {
-                publish(line);  
-            }
-            return proc.waitFor();
-        }
-            @Override
-            protected void process(java.util.List<String> chunks) {
-            
-            for (String line : chunks) {
-                terminalArea.append(line + "\n");
-                terminalArea.setCaretPosition(terminalArea.getDocument().getLength());
-            }
-        }
-            @Override
-            protected void done() {
-                try {
-                    int exitCode = get();
-                    terminalArea.append("\n--- Process exited with code " + exitCode + " ---\n");
-                } catch (Exception ex) {
-                    terminalArea.append("Exception: " + ex.getMessage() + "\n");
+                ProcessBuilder pbR = null;
+                switch (ext2) {
+                    case "java":
+                        pbR = new ProcessBuilder("java", "-cp", classDir, baseName);
+                        break;
+                    case "py":
+                        pbR = new ProcessBuilder("python3", currentFile.getPath());
+                        break;
+                    case "ts":
+                    case "tsx":
+                    case "jsx":
+                    case "js":
+                        pbR = new ProcessBuilder("node", currentFile.getPath());
+                        break;
+                    case "cpp":
+                    case "c":
+                        pbR = new ProcessBuilder(currentFile.getPath().replace("." + ext2, ""));
+                        break;
+                    default:
+                        terminalArea.append("ERROR: Run not supported for '." + ext2 + "' files.\n");
+                        return;
                 }
-            }
-        }.execute();
-              break;      
-                   
+                if (pbR == null)
+                    break;
+
+                final ProcessBuilder finalPb = pbR;
+                finalPb.redirectErrorStream(true);
+                finalPb.directory(new File(classDir));
+
+                new javax.swing.SwingWorker<Integer, String>() {
+                    @Override
+                    protected Integer doInBackground() throws Exception {
+                        Process proc = finalPb.start();
+                        BufferedReader reader = new BufferedReader(
+                                new InputStreamReader(proc.getInputStream()));
+                        String line;
+                        while ((line = reader.readLine()) != null) {
+                            publish(line);
+                        }
+                        return proc.waitFor();
+                    }
+
+                    @Override
+                    protected void process(java.util.List<String> chunks) {
+
+                        for (String line : chunks) {
+                            terminalArea.append(line + "\n");
+                            terminalArea.setCaretPosition(terminalArea.getDocument().getLength());
+                        }
+                    }
+
+                    @Override
+                    protected void done() {
+                        try {
+                            int exitCode = get();
+                            terminalArea.append("\n--- Process exited with code " + exitCode + " ---\n");
+                        } catch (Exception ex) {
+                            terminalArea.append("Exception: " + ex.getMessage() + "\n");
+                        }
+                    }
+                }.execute();
+                break;
+
             default:
-               System.out.println("Unknown command:" + s);
+                System.out.println("Unknown command:" + s);
         }
     }
+
     public static void main(String[] args) {
         new IntroScreen();
     }
+
     public void openWebPage(String url) {
         try {
             java.awt.Desktop.getDesktop().browse(java.net.URI.create(url));
-        } catch(java.io.IOException e) {
+        } catch (java.io.IOException e) {
             System.out.println(e.getMessage());
         }
     }
-    
+
     public void setEditorText(String textis) {
         text.setText(textis);
     }
+
     public File getCurrentFile() {
         return currentFile;
     }
@@ -685,52 +738,52 @@ class Nukepad extends JFrame implements ActionListener{
         editor.setAntiAliasingEnabled(true);
         applyEditorTheme(editor);
         installLiveErrorParser(editor);
-        String name= file.getName().toLowerCase();
-        switch(name.substring(name.lastIndexOf('.') +1)) {
-            case"java":
+        String name = file.getName().toLowerCase();
+        switch (name.substring(name.lastIndexOf('.') + 1)) {
+            case "java":
                 editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JAVA);
                 break;
-            case"xml":
+            case "xml":
                 editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_XML);
                 break;
-            case"html":
+            case "html":
                 editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_XML);
                 break;
-            case"js":
+            case "js":
                 editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JAVASCRIPT);
                 break;
-            case"py":
+            case "py":
                 editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_PYTHON);
                 break;
-            case"cpp":
+            case "cpp":
                 editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_CPLUSPLUS);
                 break;
-            case"cs":
+            case "cs":
                 editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_CSHARP);
                 break;
-            case"c":
+            case "c":
                 editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_C);
                 break;
-            case"tsx":
-            case"ts":
+            case "tsx":
+            case "ts":
             case "jsx":
                 editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_TYPESCRIPT);
                 break;
-            case"json":
+            case "json":
                 editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JSON);
                 break;
-            case"sql":
+            case "sql":
                 editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_SQL);
                 break;
-            case"go":
+            case "go":
                 editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_GO);
                 break;
-            case"f90":
-            case"f":
-            case"for":
+            case "f90":
+            case "f":
+            case "for":
                 editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_FORTRAN);
                 break;
-            case"php":
+            case "php":
                 editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_PHP);
                 break;
             default:
@@ -740,74 +793,176 @@ class Nukepad extends JFrame implements ActionListener{
         editor.setText(content);
         CombinedProvider tabProvider = new CombinedProvider(editor);
         tabProvider.setProjectWords(sharedProvider != null
-            ? ((CombinedProvider) sharedProvider).getProjectWords()  // see note below
-            : Collections.emptySet());
-            AutoCompletion ac = new AutoCompletion(tabProvider);
-            ac.setAutoActivationEnabled(true);
-            ac.setAutoActivationDelay(300);
-            ac.install(editor);
-        
+                ? ((CombinedProvider) sharedProvider).getProjectWords() // see note below
+                : Collections.emptySet());
+        AutoCompletion ac = new AutoCompletion(tabProvider);
+        ac.setAutoActivationEnabled(true);
+        ac.setAutoActivationDelay(300);
+        ac.install(editor);
+
         RTextScrollPane scroll = new RTextScrollPane(editor);
         scroll.setRowHeaderView(new LineNumberPanel(editor));
-        
+
         tabs.addTab(file.getName(), scroll);
         tabs.setSelectedComponent(scroll);
-        
+
         this.text = editor;
         this.currentFile = file;
-        
+
+        if (gitPanel != null) {
+            gitPanel.setRepoDir(file.getParentFile());
+        }
+
         makeTabClosable(tabs, scroll, file.getName(), file.getAbsolutePath());
-        
-       addToOpenedProjects(file.getParentFile().getAbsolutePath());
-       
-       setupDragAndDrop(scroll);
-       setupDragAndDrop(editor);
+
+        addToOpenedProjects(file.getParentFile().getAbsolutePath());
+
+        setupDragAndDrop(scroll);
+        setupDragAndDrop(editor);
     }
 
-   private void makeTabClosable(JTabbedPane tabs, Component tab, String title, String fullPath) {
-    JPanel panel = new JPanel(new BorderLayout());
-    panel.setOpaque(false);
+    private void makeTabClosable(JTabbedPane tabs, Component tab, String title, String fullPath) {
+        JPanel panel = new JPanel(new BorderLayout());
+        panel.setOpaque(false);
 
-    JLabel label = new JLabel(title);
-    JButton close = new JButton("✕");
-    close.setBorder(null);
-    close.setFocusable(false);
-    close.setContentAreaFilled(false);
+        JLabel label = new JLabel(title);
+        JButton close = new JButton("✕");
+        close.setBorder(null);
+        close.setFocusable(false);
+        close.setContentAreaFilled(false);
 
-    close.addActionListener(e -> {
-        int index = tabs.indexOfComponent(tab);
-        if (index != -1) {
-            tabs.remove(index);
+        close.addActionListener(e -> {
+            int index = tabs.indexOfComponent(tab);
+            if (index != -1) {
+                tabs.remove(index);
+            }
+        });
+
+        panel.add(label, BorderLayout.WEST);
+        panel.add(close, BorderLayout.EAST);
+
+        tabs.setTabComponentAt(tabs.indexOfComponent(tab), panel);
+    }
+
+    public File getSelectedDirectory() {
+        File dir = null;
+        if (fileTree != null) {
+            javax.swing.tree.TreePath path = fileTree.getSelectionPath();
+            if (path != null) {
+                DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
+                Object userObj = node.getUserObject();
+                if (userObj instanceof File) {
+                    File selected = (File) userObj;
+                    dir = selected.isDirectory() ? selected : selected.getParentFile();
+                }
+            }
         }
-    });
+        if (dir == null && openedProjectsTree != null) {
+            javax.swing.tree.TreePath path = openedProjectsTree.getSelectionPath();
+            if (path != null) {
+                DefaultMutableTreeNode node = (DefaultMutableTreeNode) path.getLastPathComponent();
+                Object userObj = node.getUserObject();
+                if (userObj instanceof File) {
+                    File selected = (File) userObj;
+                    dir = selected.isDirectory() ? selected : selected.getParentFile();
+                }
+            }
+        }
+        if (dir == null) {
+            dir = currentFile != null ? currentFile.getParentFile() : new File(System.getProperty("user.home"));
+        }
+        return dir;
+    }
 
-    panel.add(label, BorderLayout.WEST);
-    panel.add(close, BorderLayout.EAST);
+    private void createNewLanguageFile(String ext, String boilerplate) {
+        String filename = JOptionPane.showInputDialog(frame, "Enter filename (without extension):");
+        if (filename != null && !filename.trim().isEmpty()) {
+            filename = filename.trim();
+            
+            File dir = getSelectedDirectory();
 
-    tabs.setTabComponentAt(tabs.indexOfComponent(tab), panel);
+            File newFile = new File(dir, filename + "." + ext);
+            if (newFile.exists()) {
+                JOptionPane.showMessageDialog(frame, "File already exists!", "Error", JOptionPane.ERROR_MESSAGE);
+                return;
+            }
+            try {
+                String contentToReplace = boilerplate;
+                if (ext.equals("java")) {
+                    contentToReplace = String.format(boilerplate, filename);
+                }
+                Files.write(newFile.toPath(), contentToReplace.getBytes());
+                openFileInNewTab(newFile, contentToReplace);
+
+                // Refresh the trees
+                if (fileTree != null && dir != null) {
+                    refreshTreeDirectory(fileTree, dir);
+                }
+                if (openedProjectsTree != null && dir != null) {
+                    refreshTreeDirectory(openedProjectsTree, dir);
+                }
+            } catch (IOException ex) {
+                JOptionPane.showMessageDialog(frame, "Error creating file: " + ex.getMessage(), "Error",
+                        JOptionPane.ERROR_MESSAGE);
+            }
+        }
+    }
+
+    private void refreshTreeDirectory(JTree tree, File dir) {
+        DefaultTreeModel model = (DefaultTreeModel) tree.getModel();
+        DefaultMutableTreeNode root = (DefaultMutableTreeNode) model.getRoot();
+        java.util.Enumeration<?> e = root.breadthFirstEnumeration();
+        while (e.hasMoreElements()) {
+            DefaultMutableTreeNode node = (DefaultMutableTreeNode) e.nextElement();
+            Object userObj = node.getUserObject();
+            if (userObj instanceof File && ((File) userObj).getAbsolutePath().equals(dir.getAbsolutePath())) {
+                node.removeAllChildren();
+                File[] children = dir.listFiles();
+                if (children != null) {
+                    java.util.Arrays.sort(children, (a, b) -> {
+                        if (a.isDirectory() && !b.isDirectory())
+                            return -1;
+                        if (!a.isDirectory() && b.isDirectory())
+                            return 1;
+                        return a.getName().compareToIgnoreCase(b.getName());
+                    });
+                    for (File child : children) {
+                        DefaultMutableTreeNode childNode = new DefaultMutableTreeNode(child);
+                        if (child.isDirectory()) {
+                            childNode.add(new DefaultMutableTreeNode("Loading..."));
+                        }
+                        node.add(childNode);
+                    }
+                }
+                model.reload(node);
+                tree.expandPath(new javax.swing.tree.TreePath(node.getPath()));
+                break;
+            }
+        }
     }
 
     private JPanel buildCategoriesPanel() {
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-        
+
         Map<String, DefaultListModel<String>> categories = new LinkedHashMap<>();
-        
+
         JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 4));
         JButton addCat = new JButton("Add Category (+)");
         JButton removeCat = new JButton("Remove Category (-)");
         toolbar.add(addCat);
         toolbar.add(removeCat);
         panel.add(toolbar);
-        JLabel[] selected = {null};
-        
+        JLabel[] selected = { null };
+
         addCat.addActionListener(e -> {
             String name = JOptionPane.showInputDialog(panel, "Category Name:");
-            if (name == null || name.isBlank()) return;
-            
+            if (name == null || name.isBlank())
+                return;
+
             DefaultListModel<String> model = new DefaultListModel<>();
             categories.put(name, model);
-            
+
             JPanel section = buildCategorySection(name, model, categories, panel);
             panel.add(section);
             panel.revalidate();
@@ -819,50 +974,54 @@ class Nukepad extends JFrame implements ActionListener{
                 String choice = (String) JOptionPane.showInputDialog(
                         panel, "Which category to remove?", "Remove",
                         JOptionPane.PLAIN_MESSAGE, null, names,
-                        names.length >0?names[0] : null);
-                if(choice == null) return;
+                        names.length > 0 ? names[0] : null);
+                if (choice == null)
+                    return;
                 categories.remove(choice);
                 panel.removeAll();
                 panel.add(toolbar);
-                categories.forEach((n, m) ->
-                        panel.add(buildCategorySection(n, m, categories, panel)));
+                categories.forEach((n, m) -> panel.add(buildCategorySection(n, m, categories, panel)));
                 panel.revalidate();
                 panel.repaint();
             }
         });
-       
+
         return panel;
     }
+
     private void applyThemeToAllTabs() {
-       for (int i = 0; i < tabs.getTabCount(); i++) {
-           Component c = tabs.getComponentAt(i);
-           if(c instanceof RTextScrollPane) {
-               RSyntaxTextArea editor = (RSyntaxTextArea) ((RTextScrollPane) c).getTextArea();
-               applyEditorTheme(editor);
-               
-           }
-       }
-   }
+        for (int i = 0; i < tabs.getTabCount(); i++) {
+            Component c = tabs.getComponentAt(i);
+            if (c instanceof RTextScrollPane) {
+                RSyntaxTextArea editor = (RSyntaxTextArea) ((RTextScrollPane) c).getTextArea();
+                applyEditorTheme(editor);
+
+            }
+        }
+    }
+
     private void clearThemeOverrides() {
         String[] keys = {
-         "Panel.background", "Panel.foreground", "Label.foreground",
-        "Button.background", "Button.foreground", "MenuBar.background",
-        "MenuBar.foreground", "Menu.background", "Menu.foreground",
-        "MenuItem.background", "MenuItem.foreground", "TabbedPane.background",
-        "TabbedPane.foreground", "ScrollPane.background", "ScrollBar.background",
-        "Tree.background", "Tree.foreground", "List.background", "List.foreground",
-        "SplitPane.background", "TextField.background", "TextField.foreground",
-        "TextArea.background", "TextArea.foreground"
+                "Panel.background", "Panel.foreground", "Label.foreground",
+                "Button.background", "Button.foreground", "MenuBar.background",
+                "MenuBar.foreground", "Menu.background", "Menu.foreground",
+                "MenuItem.background", "MenuItem.foreground", "TabbedPane.background",
+                "TabbedPane.foreground", "ScrollPane.background", "ScrollBar.background",
+                "Tree.background", "Tree.foreground", "List.background", "List.foreground",
+                "SplitPane.background", "TextField.background", "TextField.foreground",
+                "TextArea.background", "TextArea.foreground"
         };
-    for (String key : keys) UIManager.put(key, null);
+        for (String key : keys)
+            UIManager.put(key, null);
     }
+
     private void applyEditorTheme(RSyntaxTextArea editor) {
         try {
             String themePath = ThemeManager.load().equals("dark")
                     ? "/org/fife/ui/rsyntaxtextarea/themes/monokai.xml"
                     : "/org/fife/ui/rsyntaxtextarea/themes/idea.xml";
-            org.fife.ui.rsyntaxtextarea.Theme theme = 
-                    org.fife.ui.rsyntaxtextarea.Theme.load(getClass().getResourceAsStream(themePath));
+            org.fife.ui.rsyntaxtextarea.Theme theme = org.fife.ui.rsyntaxtextarea.Theme
+                    .load(getClass().getResourceAsStream(themePath));
             theme.apply(editor);
         } catch (Exception e) {
             e.printStackTrace();
@@ -871,28 +1030,28 @@ class Nukepad extends JFrame implements ActionListener{
 
     private JPanel buildCategorySection(
             String name,
-            DefaultListModel<String> model, 
-            Map<String, DefaultListModel<String>> allCategories, 
+            DefaultListModel<String> model,
+            Map<String, DefaultListModel<String>> allCategories,
             JPanel parent) {
         JPanel section = new JPanel(new BorderLayout());
         section.setBorder(BorderFactory.createTitledBorder(name));
         JList<String> list = new JList<>(model);
         list.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
         section.add(new JScrollPane(list), BorderLayout.CENTER);
-        
+
         JPopupMenu popup = new JPopupMenu();
         JMenuItem addFile = new JMenuItem("Add file...");
         JMenuItem addFolder = new JMenuItem("Add folder...");
         JMenuItem removeItem = new JMenuItem("Remove selected");
-        
-        addFile.addActionListener( e -> {
+
+        addFile.addActionListener(e -> {
             JFileChooser fc = new JFileChooser();
             fc.setFileSelectionMode(JFileChooser.FILES_ONLY);
             fc.setMultiSelectionEnabled(true);
             if (fc.showOpenDialog(parent) == JFileChooser.APPROVE_OPTION)
-                for(File f : fc.getSelectedFiles())
+                for (File f : fc.getSelectedFiles())
                     model.addElement(f.getAbsolutePath());
-            
+
         });
         addFolder.addActionListener(e -> {
             JFileChooser fc2 = new JFileChooser();
@@ -906,41 +1065,45 @@ class Nukepad extends JFrame implements ActionListener{
         popup.add(addFolder);
         popup.addSeparator();
         popup.add(removeItem);
-        
+
         list.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
                 maybeShow(e);
             }
+
             @Override
             public void mouseReleased(MouseEvent e) {
                 maybeShow(e);
             }
-            private void maybeShow(MouseEvent e){
-                if(e.isPopupTrigger())
+
+            private void maybeShow(MouseEvent e) {
+                if (e.isPopupTrigger())
                     popup.show(list, e.getX(), e.getY());
             }
         });
         list.addMouseListener(new MouseAdapter() {
             @Override
             public void mouseClicked(MouseEvent e) {
-                if(e.getClickCount() == 2) {
+                if (e.getClickCount() == 2) {
                     String path = list.getSelectedValue();
-                    if(path == null) return;
+                    if (path == null)
+                        return;
                     File f = new File(path);
-                    if(!f.exists() || f.isDirectory()) return;
+                    if (!f.exists() || f.isDirectory())
+                        return;
                     try {
                         String content = new String(Files.readAllBytes(Paths.get(path)));
                         openFileInNewTab(f, content);
                     } catch (IOException ex) {
                         ex.printStackTrace();
                     }
-                        
+
                 }
             }
         });
-        
-     return section;  
+
+        return section;
     }
 
     private void addFilesFromFolder(File folder, DefaultListModel<String> model) {
@@ -951,10 +1114,13 @@ class Nukepad extends JFrame implements ActionListener{
         String indent = " ".repeat(depth);
         model.addElement(indent + "[" + folder.getName() + "]");
         File[] children = folder.listFiles();
-        if(children == null) return;
-        java.util.Arrays.sort(children, (a,b) -> {
-            if (a.isDirectory() && !b.isDirectory()) return -1;
-            if(!a.isDirectory() && b.isDirectory()) return 1;
+        if (children == null)
+            return;
+        java.util.Arrays.sort(children, (a, b) -> {
+            if (a.isDirectory() && !b.isDirectory())
+                return -1;
+            if (!a.isDirectory() && b.isDirectory())
+                return 1;
             return a.getName().compareToIgnoreCase(b.getName());
         });
         for (File child : children) {
@@ -971,18 +1137,19 @@ class Nukepad extends JFrame implements ActionListener{
         DefaultMutableTreeNode root = (DefaultMutableTreeNode) openedProjectsTreeModel.getRoot();
         for (int i = 0; i < root.getChildCount(); i++) {
             DefaultMutableTreeNode child = (DefaultMutableTreeNode) root.getChildAt(i);
-            if (child.getUserObject().equals(folder)) return;
+            if (child.getUserObject().equals(folder))
+                return;
         }
         DefaultMutableTreeNode folderNode = new DefaultMutableTreeNode(folder);
         folderNode.add(new DefaultMutableTreeNode("Loading..."));
         root.add(folderNode);
         openedProjectsTreeModel.reload(root);
         scanProjectIntoProvider(folder, sharedProvider);
-        if(interactiveTerminal != null) {
+        if (interactiveTerminal != null) {
             interactiveTerminal.cdTo(new File(path));
         }
     }
-    
+
     public void setupDragAndDrop(Component target) {
         new java.awt.dnd.DropTarget(target, new java.awt.dnd.DropTargetAdapter() {
             @Override
@@ -990,11 +1157,11 @@ class Nukepad extends JFrame implements ActionListener{
                 try {
                     evt.acceptDrop(java.awt.dnd.DnDConstants.ACTION_COPY);
                     java.awt.datatransfer.Transferable transferable = evt.getTransferable();
-                    java.util.List<File> files = (java.util.List<File>)
-                            transferable.getTransferData(java.awt.datatransfer.DataFlavor.javaFileListFlavor);
-                    
+                    java.util.List<File> files = (java.util.List<File>) transferable
+                            .getTransferData(java.awt.datatransfer.DataFlavor.javaFileListFlavor);
+
                     for (File file : files) {
-                        if(file.isDirectory()) {
+                        if (file.isDirectory()) {
                             addToOpenedProjects(file.getAbsolutePath());
                         } else {
                             String content = new String(Files.readAllBytes(file.toPath()));
@@ -1011,65 +1178,69 @@ class Nukepad extends JFrame implements ActionListener{
     }
 
     private Component buildBottomPanel() {
-       bottomTabs = new JTabbedPane();
-       
-       terminalArea = new JTextArea();
-       terminalArea.setEditable(false);
-       terminalArea.setFont(new java.awt.Font("Monospaced", java.awt.Font.PLAIN, 13));
-       applyTerminalTheme();
-       JScrollPane termScroll = new JScrollPane(terminalArea);
-       
-       String[] cols = {
-           "", "Description", "Line", "File"
-       };
-       problemsModel = new javax.swing.table.DefaultTableModel(cols, 0) {
-           public boolean isCellEditable(int r, int c) {
-               return false;
-           }
-       };
-       javax.swing.JTable problemsTable = new javax.swing.JTable(problemsModel);
-       problemsTable.getColumnModel().getColumn(0).setMaxWidth(30);
-       problemsTable.getColumnModel().getColumn(2).setMaxWidth(60);
-       
-       problemsTable.addMouseListener(new MouseAdapter() {
-           public void mouseClicked(MouseEvent e) {
-               int row = problemsTable.getSelectedRow();
-               if(row < 0) return;
-               Object lineVal = problemsModel.getValueAt(row, 2);
-               if(lineVal == null) return;
-               try {
-                   int line = Integer.parseInt(lineVal.toString());
-                   jumpToLine(text, line);
-               } catch (NumberFormatException igonored) {}
-           }
-           
-       });
-       bottomTabs.addTab("Terminal", termScroll);
-       bottomTabs.addTab("Problems", new JScrollPane(problemsTable));
-       
-       interactiveTerminal = new InteractiveTerminal();
-       bottomTabs.addTab("Shell", interactiveTerminal);
-       
-       JPanel wrapper = new JPanel (new BorderLayout());
-       wrapper.setPreferredSize(new Dimension(0, 200));
-       wrapper.add(bottomTabs);
-       return wrapper;
+        bottomTabs = new JTabbedPane();
+
+        terminalArea = new JTextArea();
+        terminalArea.setEditable(false);
+        terminalArea.setFont(new java.awt.Font("Monospaced", java.awt.Font.PLAIN, 13));
+        applyTerminalTheme();
+        JScrollPane termScroll = new JScrollPane(terminalArea);
+
+        String[] cols = {
+                "", "Description", "Line", "File"
+        };
+        problemsModel = new javax.swing.table.DefaultTableModel(cols, 0) {
+            public boolean isCellEditable(int r, int c) {
+                return false;
+            }
+        };
+        javax.swing.JTable problemsTable = new javax.swing.JTable(problemsModel);
+        problemsTable.getColumnModel().getColumn(0).setMaxWidth(30);
+        problemsTable.getColumnModel().getColumn(2).setMaxWidth(60);
+
+        problemsTable.addMouseListener(new MouseAdapter() {
+            public void mouseClicked(MouseEvent e) {
+                int row = problemsTable.getSelectedRow();
+                if (row < 0)
+                    return;
+                Object lineVal = problemsModel.getValueAt(row, 2);
+                if (lineVal == null)
+                    return;
+                try {
+                    int line = Integer.parseInt(lineVal.toString());
+                    jumpToLine(text, line);
+                } catch (NumberFormatException igonored) {
+                }
+            }
+
+        });
+        bottomTabs.addTab("Terminal", termScroll);
+        bottomTabs.addTab("Problems", new JScrollPane(problemsTable));
+
+        interactiveTerminal = new InteractiveTerminal();
+        bottomTabs.addTab("Shell", interactiveTerminal);
+
+        JPanel wrapper = new JPanel(new BorderLayout());
+        wrapper.setPreferredSize(new Dimension(0, 200));
+        wrapper.add(bottomTabs);
+        return wrapper;
     }
 
     private void applyTerminalTheme() {
-       boolean isDark = ThemeManager.load().equals("dark");
-       terminalArea.setBackground(isDark ? new Color(30, 30, 30) : new Color(255, 255, 255));
-       terminalArea.setForeground(isDark ? new Color(200, 200, 200) : new Color(30, 30, 30));
-       terminalArea.setCaretColor(isDark ? Color.WHITE : Color.BLACK);
+        boolean isDark = ThemeManager.load().equals("dark");
+        terminalArea.setBackground(isDark ? new Color(30, 30, 30) : new Color(255, 255, 255));
+        terminalArea.setForeground(isDark ? new Color(200, 200, 200) : new Color(30, 30, 30));
+        terminalArea.setCaretColor(isDark ? Color.WHITE : Color.BLACK);
     }
-    
+
     private void jumpToLine(RSyntaxTextArea editor, int line) {
         try {
-            int offset = editor.getLineStartOffset(line -1);
+            int offset = editor.getLineStartOffset(line - 1);
             editor.setCaretPosition(offset);
             editor.requestFocusInWindow();
-            
-        } catch (javax.swing.text.BadLocationException ignored) {}
+
+        } catch (javax.swing.text.BadLocationException ignored) {
+        }
     }
 
     private void toggleTerminal() {
@@ -1084,126 +1255,133 @@ class Nukepad extends JFrame implements ActionListener{
             terminalVisible = true;
         }
     }
-    
+
     private void installLiveErrorParser(RSyntaxTextArea editor) {
         editor.addParser(new AbstractParser() {
-        @Override
-        public ParseResult parse(org.fife.ui.rsyntaxtextarea.RSyntaxDocument doc, String style) {
-            DefaultParseResult result = new DefaultParseResult(this);
-            if (currentFile == null) return result;
+            @Override
+            public ParseResult parse(org.fife.ui.rsyntaxtextarea.RSyntaxDocument doc, String style) {
+                DefaultParseResult result = new DefaultParseResult(this);
+                if (currentFile == null)
+                    return result;
 
-            String ext = currentFile.getName().contains(".")
-                ? currentFile.getName().substring(currentFile.getName().lastIndexOf('.') + 1).toLowerCase()
-                : "";
+                String ext = currentFile.getName().contains(".")
+                        ? currentFile.getName().substring(currentFile.getName().lastIndexOf('.') + 1).toLowerCase()
+                        : "";
 
-            // Only parse supported compiled languages
-            if (!ext.equals("java") && !ext.equals("c") && !ext.equals("cpp")) return result;
+                // Only parse supported compiled languages
+                if (!ext.equals("java") && !ext.equals("c") && !ext.equals("cpp"))
+                    return result;
 
-            try {
-                // Save current content to a temp file first
-                File tempFile = currentFile;
-                try (FileWriter fw = new FileWriter(tempFile)) {
-                    fw.write(editor.getText());
-                }
-
-                ProcessBuilder pb;
-                switch (ext) {
-                    case "java": 
-                        File tempOut = new File(System.getProperty("java.io.tmpdir"), "nukepad_compile_out");
-                        tempOut.mkdirs();
-                        pb = new ProcessBuilder("javac", "-d", tempOut.getAbsolutePath(), tempFile.getPath());
-                        break;
-                    case "cpp":  
-                        pb = new ProcessBuilder("g++", "-fsyntax-only", tempFile.getPath()); 
-                        break;
-                    case "c":  
-                        pb = new ProcessBuilder("gcc", "-fsyntax-only", tempFile.getPath());
-                        break;
-                    default: 
-                        return result;
-                }
-                pb.redirectErrorStream(true);
-                Process proc = pb.start();
-
-                BufferedReader reader = new BufferedReader(new InputStreamReader(proc.getInputStream()));
-                Pattern pat = Pattern.compile(".+:(\\d+): (error|warning): (.+)");
-                String line;
-
-                // Clear old problems
-                SwingUtilities.invokeLater(() -> problemsModel.setRowCount(0));
-
-                while ((line = reader.readLine()) != null) {
-                    Matcher m = pat.matcher(line);
-                    if (m.find()) {
-                        int lineNum = Integer.parseInt(m.group(1));
-                        String type = m.group(2);
-                        String msg  = m.group(3);
-
-                        // Add squiggle to editor
-                        DefaultParserNotice notice = new DefaultParserNotice(
-                            this, msg, lineNum - 1
-                        );
-                        notice.setLevel(type.equals("error")
-                            ? ParserNotice.Level.ERROR
-                            : ParserNotice.Level.WARNING);
-                        result.addNotice(notice);
-
-                        // Add to Problems table
-                        String icon = type.equals("error") ? "❌" : "⚠️";
-                        final String fMsg = msg;
-                        final int fLine = lineNum;
-                        SwingUtilities.invokeLater(() ->
-                            problemsModel.addRow(new Object[]{icon, fMsg, fLine, currentFile.getName()})
-                        );
+                try {
+                    // Save current content to a temp file first
+                    File tempFile = currentFile;
+                    try (FileWriter fw = new FileWriter(tempFile)) {
+                        fw.write(editor.getText());
                     }
-                }
-                proc.waitFor();
 
-            } catch (Exception ex) {
-                
+                    ProcessBuilder pb;
+                    switch (ext) {
+                        case "java":
+                            File tempOut = new File(System.getProperty("java.io.tmpdir"), "nukepad_compile_out");
+                            tempOut.mkdirs();
+                            pb = new ProcessBuilder("javac", "-d", tempOut.getAbsolutePath(), tempFile.getPath());
+                            break;
+                        case "cpp":
+                            pb = new ProcessBuilder("g++", "-fsyntax-only", tempFile.getPath());
+                            break;
+                        case "c":
+                            pb = new ProcessBuilder("gcc", "-fsyntax-only", tempFile.getPath());
+                            break;
+                        default:
+                            return result;
+                    }
+                    pb.redirectErrorStream(true);
+                    Process proc = pb.start();
+
+                    BufferedReader reader = new BufferedReader(new InputStreamReader(proc.getInputStream()));
+                    Pattern pat = Pattern.compile(".+:(\\d+): (error|warning): (.+)");
+                    String line;
+
+                    // Clear old problems
+                    SwingUtilities.invokeLater(() -> problemsModel.setRowCount(0));
+
+                    while ((line = reader.readLine()) != null) {
+                        Matcher m = pat.matcher(line);
+                        if (m.find()) {
+                            int lineNum = Integer.parseInt(m.group(1));
+                            String type = m.group(2);
+                            String msg = m.group(3);
+
+                            // Add squiggle to editor
+                            DefaultParserNotice notice = new DefaultParserNotice(
+                                    this, msg, lineNum - 1);
+                            notice.setLevel(type.equals("error")
+                                    ? ParserNotice.Level.ERROR
+                                    : ParserNotice.Level.WARNING);
+                            result.addNotice(notice);
+
+                            // Add to Problems table
+                            String icon = type.equals("error") ? "❌" : "⚠️";
+                            final String fMsg = msg;
+                            final int fLine = lineNum;
+                            SwingUtilities.invokeLater(() -> problemsModel
+                                    .addRow(new Object[] { icon, fMsg, fLine, currentFile.getName() }));
+                        }
+                    }
+                    proc.waitFor();
+
+                } catch (Exception ex) {
+
+                }
+                File tempOut2 = new File(System.getProperty("java.io.tmpdir"), "nukepad_compile_out");
+                File[] classFiles = tempOut2.listFiles((dir, name) -> name.endsWith(".class"));
+                if (classFiles != null) {
+                    for (File cf : classFiles)
+                        cf.delete();
+                }
+                return result;
             }
-            File tempOut2 = new File(System.getProperty("java.io.tmpdir"), "nukepad_compile_out");
-            File[] classFiles = tempOut2.listFiles((dir, name) -> name.endsWith(".class"));
-            if (classFiles != null) {
-                for (File cf : classFiles) cf.delete();
-            }
-            return result;
-        }
-    });
-}
+        });
+    }
+
     private void scanProjectIntoProvider(File projectDir, CombinedProvider provider) {
         new SwingWorker<Set<String>, Void>() {
             @Override
             protected Set<String> doInBackground() throws Exception {
                 Set<String> words = new HashSet<>();
-                java.util.regex.Pattern p =
-                        java.util.regex.Pattern.compile("\\\\b[a-zA-Z_][a-zA-Z0-9_]{2,}\\\\b");
+                java.util.regex.Pattern p = java.util.regex.Pattern.compile("\\\\b[a-zA-Z_][a-zA-Z0-9_]{2,}\\\\b");
                 scanDir(projectDir, p, words, 0);
                 return words;
             }
+
             private void scanDir(File dir, java.util.regex.Pattern p,
                     Set<String> words, int depth) throws Exception {
-                if(depth > 5) return;
+                if (depth > 5)
+                    return;
                 File[] files = dir.listFiles();
-                if(files == null) return;
+                if (files == null)
+                    return;
                 for (File f : files) {
-                    if(f.isDirectory()) {
+                    if (f.isDirectory()) {
                         scanDir(f, p, words, depth + 1);
                     } else if (isSource(f)) {
-                        String content = new String (
-                        java.nio.file.Files.readAllBytes(f.toPath()));
+                        String content = new String(
+                                java.nio.file.Files.readAllBytes(f.toPath()));
                         java.util.regex.Matcher mat = p.matcher(content);
-                        while(mat.find()) words.add(mat.group());
+                        while (mat.find())
+                            words.add(mat.group());
                     }
                 }
             }
+
             private boolean isSource(File f) {
                 String n = f.getName();
-                 return n.endsWith(".java") || n.endsWith(".py")
-                || n.endsWith(".js")   || n.endsWith(".ts")
-                || n.endsWith(".cpp")  || n.endsWith(".c");
-                
+                return n.endsWith(".java") || n.endsWith(".py")
+                        || n.endsWith(".js") || n.endsWith(".ts")
+                        || n.endsWith(".cpp") || n.endsWith(".c");
+
             }
+
             @Override
             protected void done() {
                 try {
@@ -1212,8 +1390,8 @@ class Nukepad extends JFrame implements ActionListener{
                     ex.printStackTrace();
                 }
             }
-            
+
         }.execute();
-    }   
-    
+    }
+
 }

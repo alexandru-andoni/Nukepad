@@ -20,7 +20,6 @@ import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JTextField;
 import javax.swing.ListSelectionModel;
-import javax.swing.SwingUtilities;
 
 /**
  *
@@ -69,16 +68,27 @@ public class GitPanel extends JPanel {
     }
 
     private void refresh() {
-        if (repoDir == null) return;
+        if (repoDir == null) {
+            branchLabel.setText("No repo");
+            changedModel.clear();
+            return;
+        }
         try {
            Process p = new ProcessBuilder("git", "rev-parse", "--abbrev-ref", "HEAD")
                 .directory(repoDir).start();
             String branch = new BufferedReader(
                 new InputStreamReader(p.getInputStream())).readLine();
+            if (p.waitFor() != 0) {
+                branchLabel.setText("Not a git repo");
+                changedModel.clear();
+                return;
+            }
             branchLabel.setText("⎇  " + (branch != null ? branch : "unknown"));
         } catch (Exception ex) {
             branchLabel.setText("Not a git repo");
-    }
+            changedModel.clear();
+            return;
+        }
         changedModel.clear();
         try {
             Process p = new ProcessBuilder("git", "status", "--short")
@@ -95,8 +105,7 @@ public class GitPanel extends JPanel {
     }
     private void stageAll() {
         if (repoDir == null) return;
-        runner.run(repoDir, "add", "-A");
-        SwingUtilities.invokeLater(this::refresh);
+        runner.run(repoDir, this::refresh, "add", "-A");
     }
 
     private void commit() {
@@ -106,9 +115,8 @@ public class GitPanel extends JPanel {
             JOptionPane.showMessageDialog(this, "Enter a commit message");
             return;
         }
-        runner.run(repoDir, "commit", "-m", msg);
+        runner.run(repoDir, this::refresh, "commit", "-m", msg);
         commitMsg.setText("");
-        SwingUtilities.invokeLater(this::refresh);
     }
     
 }

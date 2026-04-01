@@ -8,6 +8,7 @@ com\adonis\Nukepad\IntroScreen.class
 com\adonis\Nukepad\Nukepad$2$1.class
 com\adonis\Nukepad\InteractiveTerminal$1.class
 com\adonis\Nukepad\Nukepad$4.class
+com\adonis\Nukepad\Nukepad$2$4.class
 com\adonis\Nukepad\Nukepad$9.class
 com\adonis\Nukepad\Nukepad$3.class
 com\adonis\Nukepad\BinarySearcher.class
@@ -27,6 +28,7 @@ com\adonis\Nukepad\IntroScreen$1.class
 com\adonis\Nukepad\FileTree.class
 com\adonis\Nukepad\SearchPanel$4.class
 com\adonis\Nukepad\FileTreeCellRenderer.class
+com\adonis\Nukepad\Nukepad$SidebarPosition.class
 com\adonis\Nukepad\SearchPanel.class
 com\adonis\Nukepad\CombinedProvider.class
 com\adonis\Nukepad\Nukepad$2$3.class

@@ -78,6 +78,7 @@ class Nukepad extends JFrame implements ActionListener {
     private InteractiveTerminal interactiveTerminal;
     private CombinedProvider sharedProvider;
     private JSplitPane verticalSplit;
+    private JSplitPane outerHSplit;
     private boolean terminalVisible = true;
     private int lastDividerLocation = 500;
     private GitRunner gitRunner;
@@ -87,6 +88,17 @@ class Nukepad extends JFrame implements ActionListener {
     private DefaultTreeModel openedProjectsTreeModel = new DefaultTreeModel(new DefaultMutableTreeNode("Projects"));
     private JTree fileTree;
     private JTree openedProjectsTree;
+
+    enum SidebarPosition {
+        LEFT,
+        CENTER,
+        RIGHT
+    }
+
+    private SidebarPosition sidebarPosition = SidebarPosition.LEFT;
+    private JTabbedPane rightTabs;
+    private JTabbedPane leftTabsPanel;
+    private JPanel bottomPanelCache;
 
     public static Nukepad getInstance() {
         return instance;
@@ -222,6 +234,7 @@ class Nukepad extends JFrame implements ActionListener {
 
         JButton button3 = new JButton("Author's signature");
         button3.addActionListener(new ActionListener() {
+            @Override
             public void actionPerformed(ActionEvent e) {
                 try {
                     java.awt.Desktop.getDesktop().browse(URI.create("https://github.com/alexandru-andoni"));
@@ -344,6 +357,17 @@ class Nukepad extends JFrame implements ActionListener {
         menb.add(button2);
         menb.add(button3);
         menb.add(buttonTerminal);
+        
+        JButton btnSidebarPos = new JButton ("☰ Sidebar: Left");
+        btnSidebarPos.addActionListener(e -> {
+           cycleSidebarPosition();
+           switch(sidebarPosition) {
+               case LEFT -> btnSidebarPos.setText("☰ Sidebar: Left");
+               case RIGHT -> btnSidebarPos.setText("☰ Sidebar: Right");
+               case CENTER -> btnSidebarPos.setText("☰ Sidebar: Center");
+           }
+        });
+        menb.add(btnSidebarPos);
 
         frame.setJMenuBar(menb);
         RTextScrollPane scroll2 = new RTextScrollPane(text);
@@ -379,13 +403,12 @@ class Nukepad extends JFrame implements ActionListener {
         gitPanel = new GitPanel(gitRunner);
         verticalSplit.setResizeWeight(0.75);
 
-        JSplitPane mainSplit = new JSplitPane(
-                JSplitPane.HORIZONTAL_SPLIT,
-                loadingLabel,
-                verticalSplit);
-        mainSplit.setDividerLocation(280);
-        frame.add(mainSplit, BorderLayout.CENTER);
-        instance = this;
+        outerHSplit = new JSplitPane (
+        JSplitPane.HORIZONTAL_SPLIT,
+        loadingLabel,
+        verticalSplit);
+        outerHSplit.setDividerLocation(280);
+        frame.add(outerHSplit, BorderLayout.CENTER);
 
         frame.setSize(1280, 720);
         frame.setVisible(true);
@@ -415,6 +438,16 @@ class Nukepad extends JFrame implements ActionListener {
                                 gitPanel.setRepoDir(activeDirectory);
                             }
                         }
+                    }
+                });
+                fileTree.addMouseListener(new MouseAdapter() {
+                    @Override 
+                    public void mousePressed(MouseEvent e) { 
+                     maybeShowPopup(e, fileTree); 
+                    }
+                    @Override 
+                    public void mouseReleased(MouseEvent e){
+                     maybeShowPopup(e, fileTree);
                     }
                 });
 
@@ -484,6 +517,14 @@ class Nukepad extends JFrame implements ActionListener {
                             }
                         }
                     }
+                    @Override
+                    public void mousePressed(MouseEvent e) {
+                        maybeShowPopup(e, openedProjectsTree);
+                    }
+                    @Override
+                    public void mouseReleased(MouseEvent e) {
+                        maybeShowPopup(e, openedProjectsTree);
+                    }
                 });
                 openedProjectsTree.addTreeSelectionListener(e -> {
                     javax.swing.tree.TreePath path = e.getPath();
@@ -550,8 +591,10 @@ class Nukepad extends JFrame implements ActionListener {
             protected void done() {
                 try {
                     JTabbedPane leftTabs = get();
-                    mainSplit.setLeftComponent(leftTabs);
-                    mainSplit.setDividerLocation(280);
+                    leftTabsPanel = leftTabs;
+                    hookTabFocusTracking(tabs);
+                    outerHSplit.setLeftComponent(leftTabs);
+                    outerHSplit.setDividerLocation(280);
 
                     JPanel searchPlaceholder = new JPanel(new BorderLayout());
                     searchPlaceholder.add(new JLabel("Click to load search", SwingConstants.CENTER));
@@ -1465,5 +1508,282 @@ class Nukepad extends JFrame implements ActionListener {
 
         }.execute();
     }
+
+    private void cycleSidebarPosition() {
+        switch (sidebarPosition) {
+            case LEFT :
+                moveSidebarTo(SidebarPosition.CENTER);
+                break;
+            case CENTER:
+                moveSidebarTo(SidebarPosition.RIGHT);
+                break;
+            case RIGHT:
+                moveSidebarTo(SidebarPosition.LEFT);
+                break;
+        }
+    }
+    private void moveSidebarTo(SidebarPosition target) {
+        if(target == sidebarPosition) return;
+        
+        boolean wasCenter = (sidebarPosition == SidebarPosition.CENTER);
+        boolean goCenter = (target == SidebarPosition.CENTER);
+        
+        sidebarPosition = target;
+        
+        if(wasCenter && !goCenter) {
+            mergeRightTabsIntoLeft();
+            rightTabs = null;
+        }
+        
+        if(goCenter) {
+            rightTabs = new JTabbedPane();
+            rightTabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
+            hookTabFocusTracking(rightTabs);
+            
+            if (rightTabs.getTabCount() == 0) {
+            RSyntaxTextArea rightEditor = createFreshEditor();
+            RTextScrollPane rs = new RTextScrollPane(rightEditor);
+            rs.setRowHeaderView(new LineNumberPanel(rightEditor));
+            rightTabs.addTab("Untitled", rs);
+            
+           }
+            
+        }
+        rebuildLayout();
+    }
+    private void rebuildLayout() {
+        frame.getContentPane().removeAll();
+        verticalSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT,
+        tabs, buildBottomPanelWrapper());
+        verticalSplit.setResizeWeight(0.75);
+        
+        switch(sidebarPosition) {
+            case LEFT:
+                outerHSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
+                leftTabsPanel, verticalSplit);
+                outerHSplit.setDividerLocation(280);
+                frame.add(outerHSplit, BorderLayout.CENTER);
+                break;
+            case RIGHT:
+                outerHSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
+                verticalSplit, leftTabsPanel);
+                outerHSplit.setDividerLocation(frame.getWidth() - 280);
+                frame.add(outerHSplit, BorderLayout.CENTER);
+                break;
+            case CENTER: {
+                JSplitPane rightSplit= new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
+                leftTabsPanel, rightTabs);
+                rightSplit.setDividerLocation(280);
+                rightSplit.setResizeWeight(0.0);
+                
+                JSplitPane fullH = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
+                    tabs, rightSplit);
+                fullH.setDividerLocation(frame.getWidth() / 2 - 140);
+                fullH.setResizeWeight(0.5);
+                
+                verticalSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT,
+                fullH, buildBottomPanelWrapper());
+                verticalSplit.setResizeWeight(0.75);
+                
+                frame.add(verticalSplit, BorderLayout.CENTER);
+                break;
+            }
+        }
+        frame.revalidate();
+        frame.repaint();
+    }
+    
+    private void hookTabFocusTracking(JTabbedPane pane) {
+        pane.addChangeListener(e -> {
+            Component sel = pane.getSelectedComponent();
+            if(sel instanceof RTextScrollPane) {
+                RTextScrollPane sp = (RTextScrollPane) sel;
+                RSyntaxTextArea editor = (RSyntaxTextArea) sp.getTextArea();
+                text = editor;
+                File f = (File) sp.getClientProperty("file");
+                if (f != null) {
+                    currentFile = f;
+                    activeDirectory = f.getParentFile();
+                    if (gitPanel != null) gitPanel.setRepoDir(activeDirectory);
+                }
+            }
+        });
+    }
+    private void openFileInPane(File file, JTabbedPane targetPane) {
+        try {
+           String content = new String(Files.readAllBytes(file.toPath()));
+           openFileInTab(file, content, targetPane);
+        } catch (IOException ex) {
+            JOptionPane.showMessageDialog(frame, ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
+        }
+    }
+    private void openFileInTab(File file, String content, JTabbedPane targetPane) {
+        if (targetPane == null) 
+            targetPane = tabs;
+        
+        RSyntaxTextArea editor = new RSyntaxTextArea();
+        editor.setCodeFoldingEnabled(true);
+        editor.setAntiAliasingEnabled(true);
+        applyEditorTheme(editor);
+        installLiveErrorParser(editor);
+        
+        String name = file.getName().toLowerCase();
+        String ext = name.contains(".") ? name.substring(name.lastIndexOf('.') + 1) : "";
+        switch (ext) {
+            case "java": 
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JAVA);       
+                break;
+            case "xml":
+            case "html": 
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_XML);        
+                break;
+            case "js":   
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JAVASCRIPT); 
+                break;
+            case "py":   
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_PYTHON);     
+                break;
+            case "cpp":  
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_CPLUSPLUS);  
+                break;
+            case "cs":   
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_CSHARP);     
+                break;
+            case "c":    
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_C);          
+                break;
+            case "tsx":
+            case "ts":
+            case "jsx":  
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_TYPESCRIPT); 
+                break;
+            case "json": 
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JSON);       
+                break;
+            case "sql":  
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_SQL);        
+                break;
+            case "go":   
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_GO);         
+                break;
+            case "f90":
+            case "f":
+            case "for":  
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_FORTRAN);    
+                break;
+            case "php":  
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_PHP);        
+                break;
+            default:     
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_NONE);       
+                break;
+        }
+        editor.setText(content);
+        
+        CombinedProvider tabProvider = new CombinedProvider (editor);
+        tabProvider.setProjectWords(sharedProvider != null
+        ? sharedProvider.getProjectWords()
+                : Collections.emptySet());
+        AutoCompletion ac = new AutoCompletion(tabProvider);
+        ac.setAutoActivationEnabled(true);
+        ac.setAutoActivationDelay(300);
+        ac.install(editor);
+        
+        RTextScrollPane scroll = new RTextScrollPane(editor);
+        scroll.setRowHeaderView(new LineNumberPanel(editor));
+        scroll.putClientProperty("file", file);
+
+        targetPane.addTab(file.getName(), scroll);
+        targetPane.setSelectedComponent(scroll);
+
+        this.text = editor;
+        this.currentFile = file;
+
+        if (gitPanel != null) gitPanel.setRepoDir(file.getParentFile());
+        makeTabClosable(targetPane, scroll, file.getName(), file.getAbsolutePath());
+        addToOpenedProjects(file.getParentFile().getAbsolutePath());
+        setupDragAndDrop(scroll);
+        setupDragAndDrop(editor);
+    }
+    public void maybeShowPopup(MouseEvent e, JTree tree) {
+        if (!e.isPopupTrigger()) return;
+        
+        int row = tree.getRowForLocation(e.getX(), e.getY());
+        if(row < 0) return;
+        tree.setSelectionRow(row);
+        
+        javax.swing.tree.TreePath tp = tree.getPathForRow(row);
+        if (tp == null) return;
+        DefaultMutableTreeNode node = (DefaultMutableTreeNode) tp.getLastPathComponent();
+        if(!(node.getUserObject() instanceof File)) return;
+        File clicked = (File) node.getUserObject();
+        if(clicked.isDirectory()) return;
+        
+        JPopupMenu popup = new JPopupMenu();
+        
+        if(sidebarPosition == SidebarPosition.CENTER) {
+            JMenuItem openLeft = new JMenuItem("Open on the left side");
+            openLeft.addActionListener(ae -> openFileInPane(clicked, tabs));
+            popup.add(openLeft);
+            
+            JMenuItem openRight = new JMenuItem("Open on the right side");
+            openRight.addActionListener(ae ->  {
+               if (rightTabs != null) openFileInPane(clicked, rightTabs);
+            });
+            popup.add(openRight);
+        } else {
+            JMenuItem open = new JMenuItem("Open");
+            open.addActionListener(ae -> {
+                try {
+                    String content = new String(Files.readAllBytes(clicked.toPath()));
+                    openFileInNewTab(clicked, content);
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            });
+            popup.add(open);
+        }
+        popup.show(tree, e.getX(), e.getY());
+    }
+    private RSyntaxTextArea createFreshEditor() {
+        RSyntaxTextArea eiumatlum = new RSyntaxTextArea();
+        eiumatlum.setCodeFoldingEnabled(true);
+        eiumatlum.setAntiAliasingEnabled(true);
+        applyEditorTheme(eiumatlum);
+        installLiveErrorParser(eiumatlum);
+        return eiumatlum;
+    }
+    private JPanel buildBottomPanelWrapper() {
+        if (bottomPanelCache != null)
+            return bottomPanelCache;
+        bottomPanelCache = new JPanel(new BorderLayout());
+        bottomPanelCache.setPreferredSize(new Dimension(0, 200));
+        bottomPanelCache.add(buildBottomPanel());
+        return bottomPanelCache;
+    }
+    private void mergeRightTabsIntoLeft() {
+        if (rightTabs == null) return;
+        
+        while(rightTabs.getTabCount() > 0) {
+            String title = rightTabs.getTitleAt(0);
+            Component comp = rightTabs.getComponentAt(0);
+            rightTabs.removeTabAt(0);
+            
+            
+            if (comp instanceof RTextScrollPane) {
+                File f = (File) ((RTextScrollPane) comp).getClientProperty("file");
+                if(f == null && title.equals("Untitled")) continue;
+                tabs.addTab(title, comp);
+                if (f != null) {
+                    makeTabClosable(tabs, comp, title, f.getAbsolutePath());
+                } else {
+                    tabs.addTab(title, comp);
+                }
+                
+            }
+           
+        }
+    }
+    
 
 }

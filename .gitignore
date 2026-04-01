@@ -1,0 +1,4 @@
+/dist/
+/target/
+dependency-reduced-pom.xml
+/src/test

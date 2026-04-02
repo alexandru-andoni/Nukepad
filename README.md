@@ -6,6 +6,15 @@
 
 ---
 
+# IMPORTANT NOTICE !!
+
+<img width="1979" height="1143" alt="migration" src="https://github.com/user-attachments/assets/51e8322b-5942-4afe-b618-2fcc91638636" />
+
+- Because microsoft assholes want to feed my project into their crappy AI, I have decided to migrate the project to Gitlab
+- No, this is not an april fools joke, nukepad and any future project WILL be uploaded to gitlab, except for the redundant ones
+- So, in conclusion, kiss my ass microsoft
+- (PS : I couldn't give a bigger fuck about the fact that gitlab also has paywalls, it is much better to my eyes)
+
 ## What is Nukepad?
 
 Nukepad is an alpha-stage desktop text editor written in Java, built on top of the **TEDitor** architecture and progressively expanded with real cool features. 
@@ -51,7 +60,7 @@ It's not trying to replace your IDE (and it won't, really). It's a passion proje
 
 ## Updates
 
-### v0.1.6 - alpha patch $01
+### v0.1.6 - alpha patch $01 (last patch on github)
 
 - Fixed some visual bugs
 - Got rid of all the problems

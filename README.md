@@ -103,7 +103,7 @@ It's not trying to replace your IDE — and it won't, really. It's a passion pro
 
 ```mermaid
 graph TD
-    J["TEDitor architecture"] --> A["☢️ Nukepad (main)"]
+    X["TEDitor architecture"] --> A["☢️ Nukepad (main)"]
     A --> B["🖼️ Intro Screen"]
     A --> C["📝 Editor – RSyntaxTextArea"]
     A --> D["🌳 File Tree (lazy loaded)"]

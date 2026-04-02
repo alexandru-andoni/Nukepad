@@ -143,6 +143,47 @@ graph TD
 
 ---
 
+##  Getting Started
+
+###  Option 1 — Download from the Releases tab *(recommended)*
+
+> This is the easiest way to get Nukepad running — no IDE or build tools required.
+
+1. Head over to the [**Releases**](https://github.com/alexandru-andoni/Nukepad/releases) tab on GitHub
+2. Download the latest `.jar` file from the most recent release
+3. Make sure you have a **JRE 11+** installed — [download here](https://adoptium.net/) if you don't
+4. Run the jar:
+   ```bash
+   java -jar Nukepad-x.x.x.jar
+   ```
+   Or simply **double-click** the `.jar` if your system has Java associated with it
+
+> !! If you want to use the **Compile** button, you'll need a full **JDK** (not just a JRE) so that `javac` is available on your PATH. (for java, idk about the rest just figure it out)
+
+---
+
+###  Option 2 — Run from source (IDE)
+
+> For developers who want to fork, contribute or just mess around with the code, do the following:
+
+1. **Clone the repository**
+   ```bash
+   git clone https://github.com/alexandru-andoni/Nukepad.git
+   ```
+
+2. **Open in your IDE** — IntelliJ IDEA, NetBeans, Eclipse, or any IDE with Maven support (do NOT do it in non java IDE's, pain is guaranteed)
+
+3. **Set your JDK** — make sure the project SDK is set to a **JDK 11+** (not a JRE):
+   - In IntelliJ: `File → Project Structure → SDKs`
+   - In NetBeans: `Tools → Java Platforms`
+   - In Eclipse: `Window → Preferences → Java → Installed JREs`
+
+4. **Let Maven resolve dependencies** — the `pom.xml` will pull in RSyntaxTextArea, AutoComplete, and FlatLaf automatically
+
+5. **Run the entry point** — find and run `Nukepad.java`, specifically the `main` method inside the `Nukepad` class (or build and run it, idk you do you, you be you)
+
+---
+
 ## Updates
 
 ## v0.1.7 - alpha
@@ -236,7 +277,8 @@ graph TD
 ## ℹ️ Additional Info
 
 - Built on top of the existing **TEDitor** architecture — parts of pre-alpha code are still present.
-- Want to contribute? Leave a suggestion in the **Discussions** tab.
+- Currently, the only contributor is me, and since i've migrated this project to gitlab (which has no discussins tab whatsoever), contributions are suspended for the time being
+- I will add more features based off the community feedback though, i'm not a corporate sellout
 
 ---
 

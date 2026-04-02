@@ -10,9 +10,9 @@
 [![Swing](https://img.shields.io/badge/Swing-007396?style=for-the-badge&logo=java&logoColor=white)](https://docs.oracle.com/javase/tutorial/uiswing/)
 [![FlatLaf](https://img.shields.io/badge/FlatLaf-FF6B6B?style=for-the-badge&logo=java&logoColor=white)](https://www.formdev.com/flatlaf/)
 [![RSyntaxTextArea](https://img.shields.io/badge/RSyntaxTextArea-6C63FF?style=for-the-badge&logo=java&logoColor=white)](https://github.com/bobbylight/RSyntaxTextArea)
-[![Version](https://img.shields.io/badge/version-0.1.6--alpha-brightgreen?style=for-the-badge)](https://github.com/alexandru-andoni/Nukepad)
+[![Version](https://img.shields.io/badge/version-0.1.7--alpha-brightgreen?style=for-the-badge)](https://gitlab.com/alexandru-andoni/Nukepad)
 [![License](https://img.shields.io/badge/license-Apache%202.0-blue?style=for-the-badge)](./LICENSE)
-[![Author](https://img.shields.io/badge/author-alexandru--andoni-blueviolet?style=for-the-badge&logo=github)](https://github.com/alexandru-andoni)
+[![Author](https://img.shields.io/badge/author-alexandru--andoni-blueviolet?style=for-the-badge&logo=gitlab)](https://gitlab.com/alexandru-andoni)
 
 </div>
 

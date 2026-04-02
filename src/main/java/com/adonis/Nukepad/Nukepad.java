@@ -29,10 +29,12 @@ import java.io.InputStreamReader;
 import java.net.URI;
 import java.nio.file.Files;
 import java.nio.file.Paths;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashSet;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.regex.Matcher;
@@ -84,6 +86,9 @@ class Nukepad extends JFrame implements ActionListener {
     private GitRunner gitRunner;
     private GitPanel gitPanel;
     private File activeDirectory;
+
+    private final File CATEGORIES_CONFIG_FILE = new File(System.getProperty("user.home"), ".nukepad_categories.cfg");
+    private Map<String, List<File>> categoriesData = new LinkedHashMap<>();
 
     private DefaultTreeModel openedProjectsTreeModel = new DefaultTreeModel(new DefaultMutableTreeNode("Projects"));
     private JTree fileTree;
@@ -357,15 +362,15 @@ class Nukepad extends JFrame implements ActionListener {
         menb.add(button2);
         menb.add(button3);
         menb.add(buttonTerminal);
-        
-        JButton btnSidebarPos = new JButton ("☰ Sidebar: Left");
+
+        JButton btnSidebarPos = new JButton("☰ Sidebar: Left");
         btnSidebarPos.addActionListener(e -> {
-           cycleSidebarPosition();
-           switch(sidebarPosition) {
-               case LEFT -> btnSidebarPos.setText("☰ Sidebar: Left");
-               case RIGHT -> btnSidebarPos.setText("☰ Sidebar: Right");
-               case CENTER -> btnSidebarPos.setText("☰ Sidebar: Center");
-           }
+            cycleSidebarPosition();
+            switch (sidebarPosition) {
+                case LEFT -> btnSidebarPos.setText("☰ Sidebar: Left");
+                case RIGHT -> btnSidebarPos.setText("☰ Sidebar: Right");
+                case CENTER -> btnSidebarPos.setText("☰ Sidebar: Center");
+            }
         });
         menb.add(btnSidebarPos);
 
@@ -403,10 +408,10 @@ class Nukepad extends JFrame implements ActionListener {
         gitPanel = new GitPanel(gitRunner);
         verticalSplit.setResizeWeight(0.75);
 
-        outerHSplit = new JSplitPane (
-        JSplitPane.HORIZONTAL_SPLIT,
-        loadingLabel,
-        verticalSplit);
+        outerHSplit = new JSplitPane(
+                JSplitPane.HORIZONTAL_SPLIT,
+                loadingLabel,
+                verticalSplit);
         outerHSplit.setDividerLocation(280);
         frame.add(outerHSplit, BorderLayout.CENTER);
 
@@ -441,13 +446,14 @@ class Nukepad extends JFrame implements ActionListener {
                     }
                 });
                 fileTree.addMouseListener(new MouseAdapter() {
-                    @Override 
-                    public void mousePressed(MouseEvent e) { 
-                     maybeShowPopup(e, fileTree); 
+                    @Override
+                    public void mousePressed(MouseEvent e) {
+                        maybeShowPopup(e, fileTree);
                     }
-                    @Override 
-                    public void mouseReleased(MouseEvent e){
-                     maybeShowPopup(e, fileTree);
+
+                    @Override
+                    public void mouseReleased(MouseEvent e) {
+                        maybeShowPopup(e, fileTree);
                     }
                 });
 
@@ -487,7 +493,9 @@ class Nukepad extends JFrame implements ActionListener {
                 });
 
                 JPanel categoriesPanel = buildCategoriesPanel();
-                JScrollPane categoriesScroll = new JScrollPane(categoriesPanel);
+                JPanel categoriesWrapper = new JPanel(new BorderLayout());
+                categoriesWrapper.add(categoriesPanel, BorderLayout.NORTH);
+                JScrollPane categoriesScroll = new JScrollPane(categoriesWrapper);
 
                 openedProjectsTree = new JTree(openedProjectsTreeModel);
                 openedProjectsTree.setCellRenderer(new FileTreeCellRenderer());
@@ -517,10 +525,12 @@ class Nukepad extends JFrame implements ActionListener {
                             }
                         }
                     }
+
                     @Override
                     public void mousePressed(MouseEvent e) {
                         maybeShowPopup(e, openedProjectsTree);
                     }
+
                     @Override
                     public void mouseReleased(MouseEvent e) {
                         maybeShowPopup(e, openedProjectsTree);
@@ -1057,10 +1067,9 @@ class Nukepad extends JFrame implements ActionListener {
     }
 
     private JPanel buildCategoriesPanel() {
+        loadCategoriesConfig();
         JPanel panel = new JPanel();
         panel.setLayout(new BoxLayout(panel, BoxLayout.Y_AXIS));
-
-        Map<String, DefaultListModel<String>> categories = new LinkedHashMap<>();
 
         JPanel toolbar = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 4));
         JButton addCat = new JButton("Add Category (+)");
@@ -1068,40 +1077,89 @@ class Nukepad extends JFrame implements ActionListener {
         toolbar.add(addCat);
         toolbar.add(removeCat);
         panel.add(toolbar);
-        JLabel[] selected = { null };
+
+        // Populate sections from persisted data
+        for (Map.Entry<String, List<File>> entry : categoriesData.entrySet()) {
+            panel.add(buildCategorySection(entry.getKey(), entry.getValue(), panel, toolbar));
+        }
 
         addCat.addActionListener(e -> {
             String name = JOptionPane.showInputDialog(panel, "Category Name:");
             if (name == null || name.isBlank())
                 return;
-
-            DefaultListModel<String> model = new DefaultListModel<>();
-            categories.put(name, model);
-
-            JPanel section = buildCategorySection(name, model, categories, panel);
-            panel.add(section);
+            List<File> files = new ArrayList<>();
+            categoriesData.put(name, files);
+            panel.add(buildCategorySection(name, files, panel, toolbar));
             panel.revalidate();
+            saveCategoriesConfig();
         });
-        removeCat.addActionListener(new ActionListener() {
-            @Override
-            public void actionPerformed(ActionEvent e) {
-                String[] names = categories.keySet().toArray(new String[0]);
-                String choice = (String) JOptionPane.showInputDialog(
-                        panel, "Which category to remove?", "Remove",
-                        JOptionPane.PLAIN_MESSAGE, null, names,
-                        names.length > 0 ? names[0] : null);
-                if (choice == null)
-                    return;
-                categories.remove(choice);
-                panel.removeAll();
-                panel.add(toolbar);
-                categories.forEach((n, m) -> panel.add(buildCategorySection(n, m, categories, panel)));
-                panel.revalidate();
-                panel.repaint();
-            }
+
+        removeCat.addActionListener(e -> {
+            String[] names = categoriesData.keySet().toArray(new String[0]);
+            if (names.length == 0)
+                return;
+            String choice = (String) JOptionPane.showInputDialog(
+                    panel, "Which category to remove?", "Remove",
+                    JOptionPane.PLAIN_MESSAGE, null, names, names[0]);
+            if (choice == null)
+                return;
+            categoriesData.remove(choice);
+            saveCategoriesConfig();
+            rebuildCategoriesPanel(panel, toolbar);
         });
 
         return panel;
+    }
+
+    private void rebuildCategoriesPanel(JPanel panel, JPanel toolbar) {
+        panel.removeAll();
+        panel.add(toolbar);
+        for (Map.Entry<String, List<File>> entry : categoriesData.entrySet()) {
+            panel.add(buildCategorySection(entry.getKey(), entry.getValue(), panel, toolbar));
+        }
+        panel.revalidate();
+        panel.repaint();
+    }
+
+    private void saveCategoriesConfig() {
+        try (BufferedWriter writer = new BufferedWriter(new FileWriter(CATEGORIES_CONFIG_FILE))) {
+            for (Map.Entry<String, List<File>> entry : categoriesData.entrySet()) {
+                writer.write("[" + entry.getKey() + "]");
+                writer.newLine();
+                for (File f : entry.getValue()) {
+                    writer.write(f.getAbsolutePath());
+                    writer.newLine();
+                }
+            }
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
+    }
+
+    private void loadCategoriesConfig() {
+        categoriesData.clear();
+        if (!CATEGORIES_CONFIG_FILE.exists())
+            return;
+        try {
+            List<String> lines = Files.readAllLines(CATEGORIES_CONFIG_FILE.toPath());
+            String currentCat = null;
+            for (String line : lines) {
+                line = line.trim();
+                if (line.isEmpty())
+                    continue;
+                if (line.startsWith("[") && line.endsWith("]")) {
+                    currentCat = line.substring(1, line.length() - 1);
+                    categoriesData.put(currentCat, new ArrayList<>());
+                } else if (currentCat != null) {
+                    File f = new File(line);
+                    if (f.exists()) {
+                        categoriesData.get(currentCat).add(f);
+                    }
+                }
+            }
+        } catch (IOException ex) {
+            ex.printStackTrace();
+        }
     }
 
     private void applyThemeToAllTabs() {
@@ -1145,15 +1203,87 @@ class Nukepad extends JFrame implements ActionListener {
 
     private JPanel buildCategorySection(
             String name,
-            DefaultListModel<String> model,
-            Map<String, DefaultListModel<String>> allCategories,
-            JPanel parent) {
+            List<File> files,
+            JPanel parent,
+            JPanel toolbar) {
+
         JPanel section = new JPanel(new BorderLayout());
         section.setBorder(BorderFactory.createTitledBorder(name));
-        JList<String> list = new JList<>(model);
-        list.setSelectionMode(ListSelectionModel.MULTIPLE_INTERVAL_SELECTION);
-        section.add(new JScrollPane(list), BorderLayout.CENTER);
+        section.setMaximumSize(new Dimension(Integer.MAX_VALUE, 200));
+        section.setPreferredSize(new Dimension(0, 180));
 
+        // --- Build tree model from the file list ---
+        DefaultMutableTreeNode root = new DefaultMutableTreeNode("root");
+        for (File f : files) {
+            DefaultMutableTreeNode node = new DefaultMutableTreeNode(f);
+            if (f.isDirectory())
+                node.add(new DefaultMutableTreeNode("Loading..."));
+            root.add(node);
+        }
+        DefaultTreeModel treeModel = new DefaultTreeModel(root);
+        JTree tree = new JTree(treeModel);
+        tree.setRootVisible(false);
+        tree.setShowsRootHandles(true);
+        tree.setCellRenderer(new FileTreeCellRenderer());
+
+        // Lazy folder expansion (same pattern as openedProjectsTree)
+        tree.addTreeExpansionListener(new javax.swing.event.TreeExpansionListener() {
+            @Override
+            public void treeExpanded(javax.swing.event.TreeExpansionEvent event) {
+                DefaultMutableTreeNode node = (DefaultMutableTreeNode) event.getPath().getLastPathComponent();
+                if (node.getChildCount() == 1 && node.getFirstChild().toString().equals("Loading...")) {
+                    node.removeAllChildren();
+                    File folder = (File) node.getUserObject();
+                    File[] children = folder.listFiles();
+                    if (children != null) {
+                        Arrays.sort(children, (a, b) -> {
+                            if (a.isDirectory() && !b.isDirectory())
+                                return -1;
+                            if (!a.isDirectory() && b.isDirectory())
+                                return 1;
+                            return a.getName().compareToIgnoreCase(b.getName());
+                        });
+                        for (File child : children) {
+                            DefaultMutableTreeNode childNode = new DefaultMutableTreeNode(child);
+                            if (child.isDirectory())
+                                childNode.add(new DefaultMutableTreeNode("Loading..."));
+                            node.add(childNode);
+                        }
+                    }
+                    treeModel.reload(node);
+                }
+            }
+
+            @Override
+            public void treeCollapsed(javax.swing.event.TreeExpansionEvent event) {
+            }
+        });
+
+        // Double-click to open a file
+        tree.addMouseListener(new MouseAdapter() {
+            @Override
+            public void mouseClicked(MouseEvent e) {
+                if (e.getClickCount() != 2)
+                    return;
+                javax.swing.tree.TreePath tp = tree.getPathForLocation(e.getX(), e.getY());
+                if (tp == null)
+                    return;
+                DefaultMutableTreeNode node = (DefaultMutableTreeNode) tp.getLastPathComponent();
+                if (!(node.getUserObject() instanceof File))
+                    return;
+                File f = (File) node.getUserObject();
+                if (!f.isFile())
+                    return;
+                try {
+                    String content = new String(Files.readAllBytes(f.toPath()));
+                    openFileInNewTab(f, content);
+                } catch (IOException ex) {
+                    ex.printStackTrace();
+                }
+            }
+        });
+
+        // Right-click popup
         JPopupMenu popup = new JPopupMenu();
         JMenuItem addFile = new JMenuItem("Add file...");
         JMenuItem addFolder = new JMenuItem("Add folder...");
@@ -1163,25 +1293,56 @@ class Nukepad extends JFrame implements ActionListener {
             JFileChooser fc = new JFileChooser();
             fc.setFileSelectionMode(JFileChooser.FILES_ONLY);
             fc.setMultiSelectionEnabled(true);
-            if (fc.showOpenDialog(parent) == JFileChooser.APPROVE_OPTION)
-                for (File f : fc.getSelectedFiles())
-                    model.addElement(f.getAbsolutePath());
-
+            if (fc.showOpenDialog(parent) == JFileChooser.APPROVE_OPTION) {
+                for (File f : fc.getSelectedFiles()) {
+                    if (!files.contains(f)) {
+                        files.add(f);
+                        DefaultMutableTreeNode node = new DefaultMutableTreeNode(f);
+                        root.add(node);
+                    }
+                }
+                treeModel.reload(root);
+                saveCategoriesConfig();
+            }
         });
+
         addFolder.addActionListener(e -> {
             JFileChooser fc2 = new JFileChooser();
             fc2.setFileSelectionMode(JFileChooser.DIRECTORIES_ONLY);
             if (fc2.showOpenDialog(parent) == JFileChooser.APPROVE_OPTION) {
                 File folder = fc2.getSelectedFile();
-                addFilesFromFolder(folder, model);
+                if (!files.contains(folder)) {
+                    files.add(folder);
+                    DefaultMutableTreeNode node = new DefaultMutableTreeNode(folder);
+                    node.add(new DefaultMutableTreeNode("Loading..."));
+                    root.add(node);
+                    treeModel.reload(root);
+                    saveCategoriesConfig();
+                }
             }
         });
+
+        removeItem.addActionListener(e -> {
+            javax.swing.tree.TreePath[] selectedPaths = tree.getSelectionPaths();
+            if (selectedPaths == null)
+                return;
+            for (javax.swing.tree.TreePath selPath : selectedPaths) {
+                DefaultMutableTreeNode node = (DefaultMutableTreeNode) selPath.getLastPathComponent();
+                if (node.getParent() == root && node.getUserObject() instanceof File) {
+                    files.remove((File) node.getUserObject());
+                    root.remove(node);
+                }
+            }
+            treeModel.reload(root);
+            saveCategoriesConfig();
+        });
+
         popup.add(addFile);
         popup.add(addFolder);
         popup.addSeparator();
         popup.add(removeItem);
 
-        list.addMouseListener(new MouseAdapter() {
+        tree.addMouseListener(new MouseAdapter() {
             @Override
             public void mousePressed(MouseEvent e) {
                 maybeShow(e);
@@ -1194,57 +1355,12 @@ class Nukepad extends JFrame implements ActionListener {
 
             private void maybeShow(MouseEvent e) {
                 if (e.isPopupTrigger())
-                    popup.show(list, e.getX(), e.getY());
-            }
-        });
-        list.addMouseListener(new MouseAdapter() {
-            @Override
-            public void mouseClicked(MouseEvent e) {
-                if (e.getClickCount() == 2) {
-                    String path = list.getSelectedValue();
-                    if (path == null)
-                        return;
-                    File f = new File(path);
-                    if (!f.exists() || f.isDirectory())
-                        return;
-                    try {
-                        String content = new String(Files.readAllBytes(Paths.get(path)));
-                        openFileInNewTab(f, content);
-                    } catch (IOException ex) {
-                        ex.printStackTrace();
-                    }
-
-                }
+                    popup.show(tree, e.getX(), e.getY());
             }
         });
 
+        section.add(new JScrollPane(tree), BorderLayout.CENTER);
         return section;
-    }
-
-    private void addFilesFromFolder(File folder, DefaultListModel<String> model) {
-        addFilesFromFolderRecursive(folder, model, 0);
-    }
-
-    private void addFilesFromFolderRecursive(File folder, DefaultListModel<String> model, int depth) {
-        String indent = " ".repeat(depth);
-        model.addElement(indent + "[" + folder.getName() + "]");
-        File[] children = folder.listFiles();
-        if (children == null)
-            return;
-        java.util.Arrays.sort(children, (a, b) -> {
-            if (a.isDirectory() && !b.isDirectory())
-                return -1;
-            if (!a.isDirectory() && b.isDirectory())
-                return 1;
-            return a.getName().compareToIgnoreCase(b.getName());
-        });
-        for (File child : children) {
-            if (child.isDirectory()) {
-                addFilesFromFolderRecursive(child, model, depth + 1);
-            } else {
-                model.addElement(child.getAbsolutePath());
-            }
-        }
     }
 
     public void addToOpenedProjects(String path) {
@@ -1511,7 +1627,7 @@ class Nukepad extends JFrame implements ActionListener {
 
     private void cycleSidebarPosition() {
         switch (sidebarPosition) {
-            case LEFT :
+            case LEFT:
                 moveSidebarTo(SidebarPosition.CENTER);
                 break;
             case CENTER:
@@ -1522,69 +1638,72 @@ class Nukepad extends JFrame implements ActionListener {
                 break;
         }
     }
+
     private void moveSidebarTo(SidebarPosition target) {
-        if(target == sidebarPosition) return;
-        
+        if (target == sidebarPosition)
+            return;
+
         boolean wasCenter = (sidebarPosition == SidebarPosition.CENTER);
         boolean goCenter = (target == SidebarPosition.CENTER);
-        
+
         sidebarPosition = target;
-        
-        if(wasCenter && !goCenter) {
+
+        if (wasCenter && !goCenter) {
             mergeRightTabsIntoLeft();
             rightTabs = null;
         }
-        
-        if(goCenter) {
+
+        if (goCenter) {
             rightTabs = new JTabbedPane();
             rightTabs.setTabLayoutPolicy(JTabbedPane.SCROLL_TAB_LAYOUT);
             hookTabFocusTracking(rightTabs);
-            
+
             if (rightTabs.getTabCount() == 0) {
-            RSyntaxTextArea rightEditor = createFreshEditor();
-            RTextScrollPane rs = new RTextScrollPane(rightEditor);
-            rs.setRowHeaderView(new LineNumberPanel(rightEditor));
-            rightTabs.addTab("Untitled", rs);
-            
-           }
-            
+                RSyntaxTextArea rightEditor = createFreshEditor();
+                RTextScrollPane rs = new RTextScrollPane(rightEditor);
+                rs.setRowHeaderView(new LineNumberPanel(rightEditor));
+                rightTabs.addTab("Untitled", rs);
+
+            }
+
         }
         rebuildLayout();
     }
+
     private void rebuildLayout() {
         frame.getContentPane().removeAll();
         verticalSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT,
-        tabs, buildBottomPanelWrapper());
+                tabs, buildBottomPanelWrapper());
         verticalSplit.setResizeWeight(0.75);
-        
-        switch(sidebarPosition) {
+
+        switch (sidebarPosition) {
             case LEFT:
                 outerHSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
-                leftTabsPanel, verticalSplit);
+                        leftTabsPanel, verticalSplit);
                 outerHSplit.setDividerLocation(280);
                 frame.add(outerHSplit, BorderLayout.CENTER);
                 break;
             case RIGHT:
                 outerHSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
-                verticalSplit, leftTabsPanel);
+                        verticalSplit, leftTabsPanel);
                 outerHSplit.setDividerLocation(frame.getWidth() - 280);
                 frame.add(outerHSplit, BorderLayout.CENTER);
                 break;
             case CENTER: {
-                JSplitPane rightSplit= new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
-                leftTabsPanel, rightTabs);
+                JSplitPane rightSplit = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
+                        leftTabsPanel, rightTabs);
                 rightSplit.setDividerLocation(280);
                 rightSplit.setResizeWeight(0.0);
-                
+
                 JSplitPane fullH = new JSplitPane(JSplitPane.HORIZONTAL_SPLIT,
-                    tabs, rightSplit);
+                        tabs, rightSplit);
                 fullH.setDividerLocation(frame.getWidth() / 2 - 140);
                 fullH.setResizeWeight(0.5);
-                
+
                 verticalSplit = new JSplitPane(JSplitPane.VERTICAL_SPLIT,
-                fullH, buildBottomPanelWrapper());
+                        fullH, buildBottomPanelWrapper());
                 verticalSplit.setResizeWeight(0.75);
-                
+
                 frame.add(verticalSplit, BorderLayout.CENTER);
                 break;
             }
@@ -1592,11 +1711,11 @@ class Nukepad extends JFrame implements ActionListener {
         frame.revalidate();
         frame.repaint();
     }
-    
+
     private void hookTabFocusTracking(JTabbedPane pane) {
         pane.addChangeListener(e -> {
             Component sel = pane.getSelectedComponent();
-            if(sel instanceof RTextScrollPane) {
+            if (sel instanceof RTextScrollPane) {
                 RTextScrollPane sp = (RTextScrollPane) sel;
                 RSyntaxTextArea editor = (RSyntaxTextArea) sp.getTextArea();
                 text = editor;
@@ -1604,91 +1723,94 @@ class Nukepad extends JFrame implements ActionListener {
                 if (f != null) {
                     currentFile = f;
                     activeDirectory = f.getParentFile();
-                    if (gitPanel != null) gitPanel.setRepoDir(activeDirectory);
+                    if (gitPanel != null)
+                        gitPanel.setRepoDir(activeDirectory);
                 }
             }
         });
     }
+
     private void openFileInPane(File file, JTabbedPane targetPane) {
         try {
-           String content = new String(Files.readAllBytes(file.toPath()));
-           openFileInTab(file, content, targetPane);
+            String content = new String(Files.readAllBytes(file.toPath()));
+            openFileInTab(file, content, targetPane);
         } catch (IOException ex) {
             JOptionPane.showMessageDialog(frame, ex.getMessage(), "Error", JOptionPane.ERROR_MESSAGE);
         }
     }
+
     private void openFileInTab(File file, String content, JTabbedPane targetPane) {
-        if (targetPane == null) 
+        if (targetPane == null)
             targetPane = tabs;
-        
+
         RSyntaxTextArea editor = new RSyntaxTextArea();
         editor.setCodeFoldingEnabled(true);
         editor.setAntiAliasingEnabled(true);
         applyEditorTheme(editor);
         installLiveErrorParser(editor);
-        
+
         String name = file.getName().toLowerCase();
         String ext = name.contains(".") ? name.substring(name.lastIndexOf('.') + 1) : "";
         switch (ext) {
-            case "java": 
-                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JAVA);       
+            case "java":
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JAVA);
                 break;
             case "xml":
-            case "html": 
-                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_XML);        
+            case "html":
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_XML);
                 break;
-            case "js":   
-                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JAVASCRIPT); 
+            case "js":
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JAVASCRIPT);
                 break;
-            case "py":   
-                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_PYTHON);     
+            case "py":
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_PYTHON);
                 break;
-            case "cpp":  
-                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_CPLUSPLUS);  
+            case "cpp":
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_CPLUSPLUS);
                 break;
-            case "cs":   
-                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_CSHARP);     
+            case "cs":
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_CSHARP);
                 break;
-            case "c":    
-                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_C);          
+            case "c":
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_C);
                 break;
             case "tsx":
             case "ts":
-            case "jsx":  
-                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_TYPESCRIPT); 
+            case "jsx":
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_TYPESCRIPT);
                 break;
-            case "json": 
-                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JSON);       
+            case "json":
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_JSON);
                 break;
-            case "sql":  
-                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_SQL);        
+            case "sql":
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_SQL);
                 break;
-            case "go":   
-                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_GO);         
+            case "go":
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_GO);
                 break;
             case "f90":
             case "f":
-            case "for":  
-                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_FORTRAN);    
+            case "for":
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_FORTRAN);
                 break;
-            case "php":  
-                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_PHP);        
+            case "php":
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_PHP);
                 break;
-            default:     
-                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_NONE);       
+            default:
+                editor.setSyntaxEditingStyle(SyntaxConstants.SYNTAX_STYLE_NONE);
                 break;
         }
         editor.setText(content);
-        
-        CombinedProvider tabProvider = new CombinedProvider (editor);
+
+        CombinedProvider tabProvider = new CombinedProvider(editor);
         tabProvider.setProjectWords(sharedProvider != null
-        ? sharedProvider.getProjectWords()
+                ? sharedProvider.getProjectWords()
                 : Collections.emptySet());
         AutoCompletion ac = new AutoCompletion(tabProvider);
         ac.setAutoActivationEnabled(true);
         ac.setAutoActivationDelay(300);
         ac.install(editor);
-        
+
         RTextScrollPane scroll = new RTextScrollPane(editor);
         scroll.setRowHeaderView(new LineNumberPanel(editor));
         scroll.putClientProperty("file", file);
@@ -1699,36 +1821,44 @@ class Nukepad extends JFrame implements ActionListener {
         this.text = editor;
         this.currentFile = file;
 
-        if (gitPanel != null) gitPanel.setRepoDir(file.getParentFile());
+        if (gitPanel != null)
+            gitPanel.setRepoDir(file.getParentFile());
         makeTabClosable(targetPane, scroll, file.getName(), file.getAbsolutePath());
         addToOpenedProjects(file.getParentFile().getAbsolutePath());
         setupDragAndDrop(scroll);
         setupDragAndDrop(editor);
     }
+
     public void maybeShowPopup(MouseEvent e, JTree tree) {
-        if (!e.isPopupTrigger()) return;
-        
+        if (!e.isPopupTrigger())
+            return;
+
         int row = tree.getRowForLocation(e.getX(), e.getY());
-        if(row < 0) return;
+        if (row < 0)
+            return;
         tree.setSelectionRow(row);
-        
+
         javax.swing.tree.TreePath tp = tree.getPathForRow(row);
-        if (tp == null) return;
+        if (tp == null)
+            return;
         DefaultMutableTreeNode node = (DefaultMutableTreeNode) tp.getLastPathComponent();
-        if(!(node.getUserObject() instanceof File)) return;
+        if (!(node.getUserObject() instanceof File))
+            return;
         File clicked = (File) node.getUserObject();
-        if(clicked.isDirectory()) return;
-        
+        if (clicked.isDirectory())
+            return;
+
         JPopupMenu popup = new JPopupMenu();
-        
-        if(sidebarPosition == SidebarPosition.CENTER) {
+
+        if (sidebarPosition == SidebarPosition.CENTER) {
             JMenuItem openLeft = new JMenuItem("Open on the left side");
             openLeft.addActionListener(ae -> openFileInPane(clicked, tabs));
             popup.add(openLeft);
-            
+
             JMenuItem openRight = new JMenuItem("Open on the right side");
-            openRight.addActionListener(ae ->  {
-               if (rightTabs != null) openFileInPane(clicked, rightTabs);
+            openRight.addActionListener(ae -> {
+                if (rightTabs != null)
+                    openFileInPane(clicked, rightTabs);
             });
             popup.add(openRight);
         } else {
@@ -1745,6 +1875,7 @@ class Nukepad extends JFrame implements ActionListener {
         }
         popup.show(tree, e.getX(), e.getY());
     }
+
     private RSyntaxTextArea createFreshEditor() {
         RSyntaxTextArea eiumatlum = new RSyntaxTextArea();
         eiumatlum.setCodeFoldingEnabled(true);
@@ -1753,6 +1884,7 @@ class Nukepad extends JFrame implements ActionListener {
         installLiveErrorParser(eiumatlum);
         return eiumatlum;
     }
+
     private JPanel buildBottomPanelWrapper() {
         if (bottomPanelCache != null)
             return bottomPanelCache;
@@ -1761,29 +1893,30 @@ class Nukepad extends JFrame implements ActionListener {
         bottomPanelCache.add(buildBottomPanel());
         return bottomPanelCache;
     }
+
     private void mergeRightTabsIntoLeft() {
-        if (rightTabs == null) return;
-        
-        while(rightTabs.getTabCount() > 0) {
+        if (rightTabs == null)
+            return;
+
+        while (rightTabs.getTabCount() > 0) {
             String title = rightTabs.getTitleAt(0);
             Component comp = rightTabs.getComponentAt(0);
             rightTabs.removeTabAt(0);
-            
-            
+
             if (comp instanceof RTextScrollPane) {
                 File f = (File) ((RTextScrollPane) comp).getClientProperty("file");
-                if(f == null && title.equals("Untitled")) continue;
+                if (f == null && title.equals("Untitled"))
+                    continue;
                 tabs.addTab(title, comp);
                 if (f != null) {
                     makeTabClosable(tabs, comp, title, f.getAbsolutePath());
                 } else {
                     tabs.addTab(title, comp);
                 }
-                
+
             }
-           
+
         }
     }
-    
 
 }

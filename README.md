@@ -53,9 +53,9 @@ It's not trying to replace your IDE (and it won't, really). It's a passion proje
 
 ### v0.1.6 - alpha patch $01
 
--Fixed some visual bugs
--Got rid of all the problems
--Got rid of dead code
+- Fixed some visual bugs
+- Got rid of all the problems
+- Got rid of dead code
 
 ### v0.1.6 - alpha
 

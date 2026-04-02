@@ -142,54 +142,15 @@ graph TD
 
 ---
 
-## 🚀 Supported Languages
+## Updates
 
-```
-Java  •  Python  •  JavaScript  •  TypeScript  •  JSX  •  TSX
-C  •  C++  •  C#  •  HTML  •  XML  •  JSON
-PHP  •  Go  •  React  •  and more via RSyntaxTextArea
-```
+### v0.1.6 - alpha
 
----
-
-## 📦 Running the Project
-
-```bash
-# 1. Clone the repository
-git clone https://gitlab.com/alexandru-andoni/Nukepad.git
-
-# 2. Open in your IDE (IntelliJ, NetBeans, Eclipse, etc.)
-
-# 3. Make sure you're using a JDK (not a JRE) — required for the Compile feature
-
-# 4. Build and run Nukepad.java (entry point is `main` in the Nukepad class)
-```
-
-> ⚠️ **JDK Required** — a full JDK is needed for the Compile button to invoke `javac`.  
-> A JRE alone won't cut it.
-
----
-
-## 🔗 Dependencies
-
-| Library | Purpose |
-|---|---|
-| [RSyntaxTextArea](https://github.com/bobbylight/RSyntaxTextArea) | Syntax highlighting, code folding, and editor core |
-| [AutoComplete](https://github.com/bobbylight/AutoComplete) | Language-aware autocomplete framework |
-| [FlatLaf](https://github.com/JFormDesigner/FlatLaf) | Modern, polished Swing Look & Feel (dark + light) |
-
----
-
-## 📅 Updates
-
-### v0.1.6 – alpha
-
-> 🔄 *The beginning of the transition towards beta — a huge upcoming chapter for Nukepad.*
-
-- The **New** menu now lets you create a variety of file types — not just `.txt`
-- Made the left sidebar panel **movable** to the right or center
-- Fixed bugs with the **Git implementation** (context-aware directory targeting)
-- Fixed additional visual and layout bugs
+- This update represents the beginning of the transition towards beta, a huge upcoming chapter for Nukepad.
+- The "New" section now allows you to create a variety of files, not just .txt files
+- Made the left tabs section movable to the right or center
+- Fixed bugs with the git implementation
+- Fixed more visual bugs
 
 ---
 

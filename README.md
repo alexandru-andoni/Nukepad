@@ -13,7 +13,7 @@
 - Because microsoft assholes want to feed my project into their crappy AI, I have decided to migrate the project to Gitlab
 - No, this is not an april fools joke, nukepad and any future project WILL be uploaded to gitlab, except for the redundant ones
 - So, in conclusion, kiss my ass microsoft
-- (PS : I couldn't give a bigger fuck about the fact that gitlab also has paywalls, it is much better to my eyes)
+- (PS : I couldn't give a bigger fuck about the fact that gitlab also has paywalls, it is much better)
 
 ## What is Nukepad?
 

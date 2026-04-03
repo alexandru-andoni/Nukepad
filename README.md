@@ -1,6 +1,6 @@
 <div align="center">
 
-![alt text](src/main/resources/pictures/nukepadbanner.png)
+![alt text](src/main/resources/icons/nukepadbanner-removebg-preview.png)
 
 **A working code editor.**
 

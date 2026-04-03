@@ -2,9 +2,7 @@
 
 ![alt text](src/main/resources/pictures/nukepadbanner.png)
 
-# ☢︎ Nukepad
-
-**A no-nonsense text editor built from scratch in Java Swing — because it just works.**
+**A working code editor.**
 
 [![Java](https://img.shields.io/badge/Java-ED8B00?style=for-the-badge&logo=openjdk&logoColor=white)](https://www.java.com)
 [![Swing](https://img.shields.io/badge/Swing-007396?style=for-the-badge&logo=java&logoColor=white)](https://docs.oracle.com/javase/tutorial/uiswing/)
@@ -20,19 +18,9 @@
 
 ## <?> What is Nukepad?
 
-Nukepad is an **alpha-stage desktop text editor** written in Java, built on top of the **TEDitor** architecture and progressively expanded with real developer features.
+Nukepad is a **desktop code editor** written in Java, built on top of the **TEDitor**(pre-alpha) architecture(see github.com/alexandru-andoni/TEDitor) and progressively expanded with real developer features.
 
-It's not trying to replace your IDE — and it won't, really. It's a passion project with a vision, and it's getting better every version.
-
-```
-┌─────────────────────────────────────────────────────┐
-│  ☢︎  N U K E P A D  ☢︎                               │
-│  ─────────────────────────────────────────────────  │
-│  🌳 File Tree  │  📄 Editor Tabs  │  ⎇ Git Panel   │
-│  🔍 Search     │  📁 Projects     │  🗂️ Categories  │
-│  💻 Terminal   │  ⚠️ Problems     │  🎨 Themes      │
-└─────────────────────────────────────────────────────┘
-```
+It's not trying to replace your IDE (and it won't, really). It's a passion project that gets better and better with every released version.
 
 ---
 

@@ -1156,12 +1156,18 @@ class Nukepad extends JFrame implements ActionListener {
     }
 
     private void applyThemeToAllTabs() {
-        for (int i = 0; i < tabs.getTabCount(); i++) {
-            Component c = tabs.getComponentAt(i);
+        applyThemeToPane(tabs);
+        applyThemeToPane(rightTabs);
+    }
+
+    private void applyThemeToPane(JTabbedPane pane) {
+        if (pane == null)
+            return;
+        for (int i = 0; i < pane.getTabCount(); i++) {
+            Component c = pane.getComponentAt(i);
             if (c instanceof RTextScrollPane) {
                 RSyntaxTextArea editor = (RSyntaxTextArea) ((RTextScrollPane) c).getTextArea();
                 applyEditorTheme(editor);
-
             }
         }
     }
@@ -1647,6 +1653,7 @@ class Nukepad extends JFrame implements ActionListener {
 
             if (rightTabs.getTabCount() == 0) {
                 RSyntaxTextArea rightEditor = createFreshEditor();
+                applyEditorTheme(rightEditor);
                 RTextScrollPane rs = new RTextScrollPane(rightEditor);
                 rs.setRowHeaderView(new LineNumberPanel(rightEditor));
                 rightTabs.addTab("Untitled", rs);

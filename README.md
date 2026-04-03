@@ -143,18 +143,18 @@ graph LR
 
 ##  Getting Started
 
-###  Option 1 — Download from the Releases tab *(recommended)*
+###  Option 1 — Download the .jar or the .exe from the Releases tab *(recommended)*
 
 > This is the easiest way to get Nukepad running — no IDE or build tools required.
 
-1. Head over to the [**Releases**](https://github.com/alexandru-andoni/Nukepad/releases) tab on GitHub
-2. Download the latest `.jar` file from the most recent release
+1. Head over to the [**Releases**](https://gitlab.com/alexandru-andoni/Nukepad/releases) tab on GitLab
+2. Download the latest `.jar` or `.exe` file from the most recent release
 3. Make sure you have a **JRE 11+** installed — [download here](https://adoptium.net/) if you don't
 4. Run the jar:
    ```bash
    java -jar Nukepad-x.x.x.jar
    ```
-   Or simply **double-click** the `.jar` if your system has Java associated with it
+   Or simply **double-click** the `.jar` or `.exe` file
 
 > !! If you want to use the **Compile** button, you'll need a full **JDK** (not just a JRE) so that `javac` is available on your PATH. (for java, idk about the rest just figure it out)
 
@@ -166,7 +166,7 @@ graph LR
 
 1. **Clone the repository**
    ```bash
-   git clone https://github.com/alexandru-andoni/Nukepad.git
+   git clone https://gitlab.com/alexandru-andoni/Nukepad.git
    ```
 
 2. **Open in your IDE** — IntelliJ IDEA, NetBeans, Eclipse, or any IDE with Maven support (do NOT do it in non java IDE's, pain is guaranteed)
@@ -183,6 +183,11 @@ graph LR
 ---
 
 ## Updates
+
+### v0.1.8 - alpha
+
+- Added a second batch of releases
+- Modified the README markdown file so it looks sexier and is more accurate now
 
 ## v0.1.7 - alpha
 

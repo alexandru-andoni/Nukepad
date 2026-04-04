@@ -35,11 +35,6 @@
         <artifactId>autocomplete</artifactId>
         <version>3.3.3</version>
     </dependency>
-    <dependency>
-    <groupId>com.formdev</groupId>
-    <artifactId>flatlaf</artifactId>
-    <version>3.4</version>
-    </dependency>
     </dependencies>
     <build>
       <finalName>Nukepad</finalName> <plugins>
@@ -64,7 +59,7 @@
             </executions>
         </plugin>
         <plugin>
-    <groupId>com.akaver.maven.plugins</groupId>
+    <groupId>com.akathist.maven.plugins.launch4j</groupId>
     <artifactId>launch4j-maven-plugin</artifactId>
     <version>2.5.2</version>
     <executions>

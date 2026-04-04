@@ -73,15 +73,18 @@ import org.fife.ui.rtextarea.RTextScrollPane;
  * @author croco
  */
 class Nukepad extends JFrame implements ActionListener {
-    private InteractiveTerminal interactiveTerminal;
-    private CombinedProvider sharedProvider;
-    private JSplitPane verticalSplit;
-    private JSplitPane outerHSplit;
-    private boolean terminalVisible = true;
-    private int lastDividerLocation = 500;
-    private GitRunner gitRunner;
-    private GitPanel gitPanel;
-    private File activeDirectory;
+    private InteractiveTerminal interactiveTerminal; // Declares the terminal (with the output of certain command
+                                                     // executions)
+    private CombinedProvider sharedProvider;// Declares the combined provider (forgit what it is)
+    private JSplitPane verticalSplit;// Declares a vertical split pane (top + bottom, usefull for showing both the
+                                     // terminal and the editor itself)
+    private JSplitPane outerHSplit;// Declares the outer horizontal split pane(left and right, only while the left
+                                   // tabs section is moved to the center)
+    private boolean terminalVisible = true; // Just tells the IDE / Computer that the terminal is visible initially
+    private int lastDividerLocation = 500; // Last divider location for the vertical split pane (also initializes it)
+    private GitRunner gitRunner; // Runs git
+    private GitPanel gitPanel; // The git pannel
+    private File activeDirectory; // Active directory, usefull for git
 
     private final File CATEGORIES_CONFIG_FILE = new File(System.getProperty("user.home"), ".nukepad_categories.cfg");
     private Map<String, List<File>> categoriesData = new LinkedHashMap<>();
@@ -145,7 +148,7 @@ class Nukepad extends JFrame implements ActionListener {
         JMenu men1 = new JMenu("File");
 
         JMenu menit1 = new JMenu("New");
-        String[][] fileTypes = {
+        String[][] fileTypes = { // File types shown in the New submenu and their default text
                 { "Java Class", "java",
                         "public class %s {\n    public static void main(String[] args) {\n        System.out.println(\"Hello World!\");\n    }\n}\n" },
                 { "C++ Source", "cpp",
@@ -156,29 +159,30 @@ class Nukepad extends JFrame implements ActionListener {
                 { "JavaScript File", "js", "console.log('Hello World!');\n" },
                 { "TypeScript File", "ts", "console.log('Hello World!');\n" }
         };
-        for (String[] type : fileTypes) {
+        for (String[] type : fileTypes) { // Adds the selected file type from the new submenu
             JMenuItem item = new JMenuItem(type[0]);
             item.addActionListener(e -> createNewLanguageFile(type[1], type[2]));
             menit1.add(item);
         }
 
-        JMenuItem menit2 = new JMenuItem("Open");
+        JMenuItem menit2 = new JMenuItem("Open"); // Self explainable, adds menu items for the JMenu
         JMenuItem menit3 = new JMenuItem("Save");
         JMenuItem menit4 = new JMenuItem("Print");
         JMenuItem menit5 = new JMenuItem("Quit");
 
-        menit2.addActionListener(this);
+        menit2.addActionListener(this); // Adds action listeners to the menu items (tells them what to do, see code
+                                        // below)
         menit3.addActionListener(this);
         menit4.addActionListener(this);
         menit5.addActionListener(this);
 
-        men1.add(menit1);
+        men1.add(menit1); // Adds menu items to a certain menu
         men1.add(menit2);
         men1.add(menit3);
         men1.add(menit4);
         men1.add(menit5);
 
-        JMenu men2 = new JMenu("Edit");
+        JMenu men2 = new JMenu("Edit"); // Same as above
         JMenuItem menit6 = new JMenuItem("Cut");
         JMenuItem menit7 = new JMenuItem("Copy");
         JMenuItem menit8 = new JMenuItem("Paste");
@@ -187,28 +191,29 @@ class Nukepad extends JFrame implements ActionListener {
         menit7.addActionListener(this);
         menit8.addActionListener(this);
 
-        JMenu men3 = new JMenu("View");
+        JMenu men3 = new JMenu("View"); // Dark theme and light theme switcher, disguised as a menu
         JMenuItem darkTheme = new JMenuItem("Dark Theme");
         JMenuItem lightTheme = new JMenuItem("Light Theme");
 
-        darkTheme.addActionListener(e -> {
+        darkTheme.addActionListener(e -> { // Action listener for the dark theme button
             try {
 
-                ThemeManager.save("dark");
-                clearThemeOverrides();
-                UIManager.setLookAndFeel(new FlatDarculaLaf());
-                applyThemeToAllTabs();
-                applyTerminalTheme();
-                interactiveTerminal.applyTheme(true);
-                SwingUtilities.updateComponentTreeUI(frame);
-                frame.repaint();
+                ThemeManager.save("dark"); // Saves the theme in a .txt file
+                clearThemeOverrides(); // Clears the theme overrides (duuh)
+                UIManager.setLookAndFeel(new FlatDarculaLaf()); // Sets the UI look and feel to dark mode
+                applyThemeToAllTabs(); // Applies the theme to all tabs
+                applyTerminalTheme(); // Applies the theme to the terminal
+                interactiveTerminal.applyTheme(true); // Applies the theme to the interactive terminal
+                SwingUtilities.updateComponentTreeUI(frame); // Updates the UI so as to adapt to the theme
+                frame.repaint(); // Repaints the UI
 
             } catch (Exception ex) {
-                ex.printStackTrace();
+                ex.printStackTrace(); // Prints the stack trace (error message) if something goes wrong (.00000001%
+                                      // chance it happens)
             }
         });
 
-        lightTheme.addActionListener(e -> {
+        lightTheme.addActionListener(e -> { // Same thing as above, only this is for light theme
             try {
 
                 ThemeManager.save("light");
@@ -223,7 +228,7 @@ class Nukepad extends JFrame implements ActionListener {
                 ex.printStackTrace();
             }
         });
-        men3.add(darkTheme);
+        men3.add(darkTheme); // Adds the dark and light theme switcher to a menu
         men3.add(lightTheme);
         menb.add(men3);
 

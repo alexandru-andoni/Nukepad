@@ -33,6 +33,10 @@ upload_exe_to_registry :
       curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
            --upload-file target/Nukepad.exe \
            "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/Nukepad/${CI_COMMIT_TAG}/Nukepad.exe"
+  - |
+      curl --header "JOB-TOKEN: ${CI_JOB_TOKEN}" \
+           --upload-file target/*.jar \
+           "${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/Nukepad/${CI_COMMIT_TAG}/Nukepad.jar"
 
 create_release:
   stage: release
@@ -49,4 +53,7 @@ create_release:
       links:
         - name: 'Nukepad.exe'
           url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/Nukepad/${CI_COMMIT_TAG}/Nukepad.exe'
+          link_type: 'package'
+        - name: 'Nukepad.jar'
+          url: '${CI_API_V4_URL}/projects/${CI_PROJECT_ID}/packages/generic/Nukepad/${CI_COMMIT_TAG}/Nukepad.jar'
           link_type: 'package'
